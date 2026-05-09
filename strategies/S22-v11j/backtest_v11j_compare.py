@@ -147,14 +147,19 @@ def simulate(trades, max_loss_per_trade=MAX_LOSS_PER_TRADE):
         base = SHORT_POSITION_FACTOR if (t["direction"] == "short" and v8 >= SHORT_V8_THRESHOLD) else 1.0
         mult = base * calc_mult(t, consec)
 
-        # 开仓前缩仓：如果估算亏损超限，按比例缩小mult，盈亏同比缩小
-        raw_pnl = t.get("pnl_usd", 0)
-        if max_loss_per_trade is not None and raw_pnl < 0 and abs(raw_pnl) * mult > max_loss_per_trade:
-            shrink_ratio = max_loss_per_trade / (abs(raw_pnl) * mult)
-            loss_cap_savings += abs(raw_pnl) * mult - max_loss_per_trade
-            mult *= shrink_ratio  # 缩仓：mult变小，盈亏同比缩小
+        # 开仓前缩仓：基于开仓前已知信息(position_usd, signal_sl_pct, leverage)算风险
+        # 不偷看 pnl_usd 正负，盈亏单同样缩仓
+        if max_loss_per_trade is not None:
+            pos_usd = t.get("position_usd", 0)
+            sl_pct = t.get("signal_sl_pct", 0)
+            lev = t.get("leverage", 3)
+            est_risk = pos_usd * sl_pct * lev * mult  # 开仓前估算最大亏损
+            if est_risk > max_loss_per_trade:
+                shrink_ratio = max_loss_per_trade / est_risk
+                loss_cap_savings += est_risk - max_loss_per_trade
+                mult *= shrink_ratio  # 缩仓：mult变小，盈亏同比缩小
 
-        pnl = raw_pnl * mult
+        pnl = t.get("pnl_usd", 0) * mult
 
         balance += pnl
         peak = max(peak, balance)
