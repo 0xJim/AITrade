@@ -172,30 +172,68 @@ V11I_SL_WIDE_MULT = 1.2
 
 # ── 策略5: 硬过滤规则 ──
 # 来源: v11i回测 — 过滤极端参数避免重仓踩坑
-V11I_MAX_SL_PCT = 10.0          # SL>10%跳过 (回测: SL>10%信号不稳定)
+V11I_MAX_SL_PCT = 10.0          # 默认值，会被STRATEGY_PROFILE覆盖
 V11I_MAX_ATR_PCT = 5.0          # ATR>5%跳过 (回测: 高ATR波动太大)
 V11I_FILTER_V8_RSI = True       # V8≥6.5+RSI<55做多跳过 (v11i教训: RSI≥55做多限制太严误杀+$816)
 
 # ── 策略6: 连续亏损冷却 ──
 # 来源: v11i回测 — 连续亏损后降低仓位避免情绪化加仓
 V11I_CONSEC_LOSS_THRESHOLD = 2  # 连续亏损≥2笔后启动冷却
-V11I_CONSEC_LOSS_MULT = 0.7     # 冷却期仓位倍率
+V11I_CONSEC_LOSS_MULT = 0.7     # 默认值，会被STRATEGY_PROFILE覆盖
 
 # ═══════════════════════════════════════════════════════════════════
-# v11j新增: 单笔亏损上限 — 开仓前缩仓(盈利同步缩小)
+# v11j Profile 系统 — 可切换策略参数集
 # ═══════════════════════════════════════════════════════════════════
-# ★ 注意: 离线模拟(backtest_all_optimizations.py)之前用「亏损硬截断」
-#   只截亏损不截盈利，严重高估收益。已修正为「开仓前缩仓」。
-#   修正后方案M(仅上限$40): +$4,011/DD16.5%/ROI/DD=24.38(vs基线ROI/DD=16.2)
+# M40 = 保守安全挡(testnet/小资金/冷启动)
+# G60 = 下一阶段主测方案(收益弹性+风控平衡)
+# D60 = 对照组(验证连亏减仓0.5的贡献)
+# L7  = 研究基准(SL过滤因子，无单笔硬帽)
 #
-# 修正后的最优方案(按ROI/DD):
-#   方案L(仅SL≤7%): +$5,103/DD14.7%/ROI/DD=34.81
-#   方案G(连亏×0.5+上限$60): +$5,559/DD17.6%/ROI/DD=31.50
-#   方案D(仅上限$60): +$5,520/DD18.6%/ROI/DD=29.71
+# 缩仓逻辑: 开仓前 est_risk = position_usd × signal_sl_pct × leverage × mult
+#            若 est_risk > MAX_LOSS_PER_TRADE，按比例缩小mult
+#            不用 raw_pnl < 0 决定是否缩仓(已修正偷看未来bug)
 # ═══════════════════════════════════════════════════════════════════
-MAX_LOSS_PER_TRADE = 40.0       # 单笔最大亏损(USDT)，超限则缩小仓位
-# 逻辑: 开仓时计算 max_loss = pos_usd × sl_pct × leverage
-#        若 max_loss > MAX_LOSS_PER_TRADE，则缩小pos_usd使max_loss = MAX_LOSS_PER_TRADE
+
+STRATEGY_PROFILES = {
+    "M40": {
+        "description": "保守安全挡 — testnet/小资金/冷启动",
+        "MAX_LOSS_PER_TRADE": 40.0,
+        "V11I_CONSEC_LOSS_MULT": 0.7,
+        "V11I_MAX_SL_PCT": 10.0,
+    },
+    "D60": {
+        "description": "对照组 — 验证连亏减仓0.5的贡献",
+        "MAX_LOSS_PER_TRADE": 60.0,
+        "V11I_CONSEC_LOSS_MULT": 0.7,
+        "V11I_MAX_SL_PCT": 10.0,
+    },
+    "G60": {
+        "description": "下一阶段主测 — 收益弹性+风控平衡",
+        "MAX_LOSS_PER_TRADE": 60.0,
+        "V11I_CONSEC_LOSS_MULT": 0.5,
+        "V11I_MAX_SL_PCT": 10.0,
+    },
+    "L7": {
+        "description": "研究基准 — SL过滤因子(无单笔硬帽)",
+        "MAX_LOSS_PER_TRADE": None,
+        "V11I_CONSEC_LOSS_MULT": 0.7,
+        "V11I_MAX_SL_PCT": 7.0,
+    },
+}
+
+# 默认profile暂保持M40，不直接切线上默认
+# 下一轮testnet主测G60
+STRATEGY_PROFILE = "M40"
+
+# ── 应用 Profile 覆盖 ──
+_profile = STRATEGY_PROFILES.get(STRATEGY_PROFILE)
+if _profile is None:
+    raise ValueError(f"Unknown STRATEGY_PROFILE: {STRATEGY_PROFILE!r}. "
+                     f"Available: {list(STRATEGY_PROFILES.keys())}")
+
+MAX_LOSS_PER_TRADE = _profile["MAX_LOSS_PER_TRADE"]
+V11I_CONSEC_LOSS_MULT = _profile["V11I_CONSEC_LOSS_MULT"]
+V11I_MAX_SL_PCT = _profile["V11I_MAX_SL_PCT"]
 
 # 兼容: 旧V11G变量指向V11I
 V11G_V8_LOW_THRESHOLD = V11I_V8_LOW_THRESHOLD

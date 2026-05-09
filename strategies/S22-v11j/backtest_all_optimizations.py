@@ -1,20 +1,13 @@
 #!/usr/bin/env python3
 """
-v11i 回撤优化 — 全方案回测对比
-基于v10原始535笔数据 → v11i参数 → 不同回撤控制方案
+v11j Profile 系统回测 — M40/D60/G60/L7 四组对比
+基于v10原始535笔数据 → v11i参数 → Profile化参数集
 
-方案列表:
-  A: v11i基线(无改动)
-  B: SL≤8% (砍掉宽止损)
-  C: 连亏2笔×0.5
-  D: 单笔亏损上限$60
-  E: B+C组合 (SL≤8% + 连亏×0.5)
-  F: B+D组合 (SL≤8% + 单笔上限$60)
-  G: C+D组合 (连亏×0.5 + 单笔上限$60)
-  H: B+C+D全组合 = 方案⑥
-  I: H加强版 (SL≤7% + 连亏×0.4 + 上限$50)
-  J: H宽松版 (SL≤9% + 连亏×0.6 + 上限$80)
-  K: v11new风格 (只保留做多RSI>55信号 + 方案H)
+Profile 定义:
+  M40: 保守安全挡(testnet/小资金/冷启动) — MAX_LOSS=$40, CONSEC×0.7, SL≤10%
+  D60: 对照组(验证连亏0.5贡献) — MAX_LOSS=$60, CONSEC×0.7, SL≤10%
+  G60: 下一阶段主测(收益弹性+风控平衡) — MAX_LOSS=$60, CONSEC×0.5, SL≤10%
+  L7:  研究基准(SL过滤因子) — 无硬帽, CONSEC×0.7, SL≤7%
 """
 import json
 import sys
@@ -56,11 +49,41 @@ SL_MEDIUM_MULT = 0.65
 SL_WIDE_LOW = 8.0
 SL_WIDE_HIGH = 10.0
 SL_WIDE_MULT = 1.2
-MAX_SL_PCT_BASE = 10.0
 MAX_ATR_PCT = 5.0
 FILTER_V8_RSI = True
 CONSEC_LOSS_THRESHOLD = 2
-CONSEC_LOSS_MULT_BASE = 0.7
+
+# ═══ Profile 定义 ═══
+PROFILES = {
+    "M40": {
+        "desc": "保守安全挡(testnet/冷启动)",
+        "role": "风控底座",
+        "max_loss_per_trade": 40,
+        "consec_loss_mult": 0.7,
+        "max_sl_pct": 10.0,
+    },
+    "D60": {
+        "desc": "对照组(验证连亏×0.5贡献)",
+        "role": "对照",
+        "max_loss_per_trade": 60,
+        "consec_loss_mult": 0.7,
+        "max_sl_pct": 10.0,
+    },
+    "G60": {
+        "desc": "下一阶段主测(收益弹性+风控平衡)",
+        "role": "主测 ★",
+        "max_loss_per_trade": 60,
+        "consec_loss_mult": 0.5,
+        "max_sl_pct": 10.0,
+    },
+    "L7": {
+        "desc": "研究基准(SL过滤因子)",
+        "role": "研究",
+        "max_loss_per_trade": None,
+        "consec_loss_mult": 0.7,
+        "max_sl_pct": 7.0,
+    },
+}
 
 
 def get_rsi(t):
@@ -109,13 +132,11 @@ def calc_mult(trade, consec_losses, consec_loss_mult=0.7):
     sl_pct = trade.get("signal_sl_pct", 0) * 100
     d = trade["direction"]
 
-    # V8区间
     if v8 <= 4:
         m *= V8_LOW_MULT_LONG if d == "long" else V8_LOW_MULT_SHORT
     elif v8 >= V8_HIGH_THRESHOLD:
         m *= V8_HIGH_MULT_LONG if d == "long" else 0.6
 
-    # RSI (仅做多)
     if d == "long" and rsi is not None:
         if rsi < RSI_WEAK:
             m *= RSI_WEAK_MULT
@@ -126,32 +147,26 @@ def calc_mult(trade, consec_losses, consec_loss_mult=0.7):
         elif rsi >= RSI_VERY_STRONG:
             m *= RSI_VERY_STRONG_MULT
 
-    # SL%
     if SL_MEDIUM_LOW <= sl_pct <= SL_MEDIUM_HIGH:
         m *= SL_MEDIUM_MULT
     elif SL_WIDE_LOW <= sl_pct <= SL_WIDE_HIGH:
         m *= SL_WIDE_MULT
 
-    # 连续亏损
     if consec_losses >= CONSEC_LOSS_THRESHOLD:
         m *= consec_loss_mult
 
     return m
 
 
-def simulate(trades, config):
+def simulate(trades, profile_name, config):
     """
-    config: {
-        max_sl_pct: float,        # SL硬过滤上限
-        consec_loss_mult: float,  # 连亏减仓倍率
-        max_loss_per_trade: float,# 单笔亏损上限($)
-    }
+    config: profile 参数集
+    返回完整统计含 capped_win/loss_count, gross_profit/loss_after_cap
     """
-    max_sl = config.get("max_sl_pct", 10.0)
-    cl_mult = config.get("consec_loss_mult", 0.7)
+    max_sl = config["max_sl_pct"]
+    cl_mult = config["consec_loss_mult"]
     max_loss = config.get("max_loss_per_trade", None)
 
-    # 先做硬过滤
     filtered = apply_hard_filters(trades, max_sl_pct=max_sl)
 
     balance = INITIAL_BALANCE
@@ -162,18 +177,21 @@ def simulate(trades, config):
     consec = 0
     adj = []
     monthly = defaultdict(list)
-    gross_profit = 0
-    gross_loss = 0
-    skipped_by_loss_cap = 0
-    loss_cap_savings = 0
+
+    # Profile 特有统计
+    gross_profit_after_cap = 0
+    gross_loss_after_cap = 0
+    capped_win_count = 0
+    capped_loss_count = 0
 
     for t in filtered:
         v8 = t.get("v8_score", 0) or t.get("v8_quality", 0)
         base = SHORT_POSITION_FACTOR if (t["direction"] == "short" and v8 >= SHORT_V8_THRESHOLD) else 1.0
         mult = base * calc_mult(t, consec, consec_loss_mult=cl_mult)
 
-        # 开仓前缩仓：基于开仓前已知信息(position_usd, signal_sl_pct, leverage)算风险
-        # 不偷看 pnl_usd 正负，盈亏单同样缩仓
+        # 开仓前缩仓: est_risk = position_usd × signal_sl_pct × leverage × mult
+        # 不看 pnl 正负
+        capped = False
         if max_loss is not None:
             pos_usd = t.get("position_usd", 0)
             sl_pct = t.get("signal_sl_pct", 0)
@@ -181,10 +199,11 @@ def simulate(trades, config):
             est_risk = pos_usd * sl_pct * lev * mult
             if est_risk > max_loss:
                 shrink_ratio = max_loss / est_risk
-                loss_cap_savings += est_risk - max_loss
                 mult *= shrink_ratio
+                capped = True
 
-        pnl = t.get("pnl_usd", 0) * mult
+        raw_pnl = t.get("pnl_usd", 0)
+        pnl = raw_pnl * mult
 
         balance += pnl
         peak = max(peak, balance)
@@ -196,13 +215,19 @@ def simulate(trades, config):
             max_dd_trough = balance
 
         if pnl > 0:
-            gross_profit += pnl
+            gross_profit_after_cap += pnl
+            if capped:
+                capped_win_count += 1
         else:
-            gross_loss += abs(pnl)
+            gross_loss_after_cap += abs(pnl)
+            if capped:
+                capped_loss_count += 1
 
         at = {**t}
         at["pnl_usd"] = round(pnl, 2)
+        at["pnl_raw"] = round(raw_pnl, 2)
         at["position_mult"] = round(mult, 3)
+        at["capped"] = capped
         at["running_balance"] = round(balance, 2)
         adj.append(at)
         monthly[t["entry_time"][:7]].append(at)
@@ -216,7 +241,7 @@ def simulate(trades, config):
     wins = sum(1 for t in adj if t["pnl_usd"] > 0)
     losses = total_trades - wins
     win_rate = wins / total_trades * 100
-    profit_factor = gross_profit / gross_loss if gross_loss > 0 else 99
+    profit_factor = gross_profit_after_cap / gross_loss_after_cap if gross_loss_after_cap > 0 else 99
 
     # 月度统计
     monthly_pnl = {}
@@ -238,28 +263,25 @@ def simulate(trades, config):
             current_consec = 0
 
     # 单笔最大亏损
-    max_single_loss = min(t["pnl_usd"] for t in adj) if adj else 0
+    max_single_loss = min(t["pnl_usd"] for t in adj)
 
-    # 前10大亏损
+    # Top 10 亏损
     top_losses = sorted([t["pnl_usd"] for t in adj])[:10]
 
-    # 按季度统计
-    quarterly = defaultdict(list)
-    for t in adj:
-        q = t["entry_time"][:7]
-        year, month = q.split("-")
-        qkey = f"{year}-Q{(int(month)-1)//3+1}"
-        quarterly[qkey].append(t["pnl_usd"])
+    roi_pct = (balance - INITIAL_BALANCE) / INITIAL_BALANCE * 100
 
     return {
+        "profile": profile_name,
         "total_trades": total_trades,
         "wins": wins,
         "losses": losses,
         "win_rate": round(win_rate, 1),
         "total_pnl": round(balance - INITIAL_BALANCE, 2),
         "final_balance": round(balance, 2),
-        "gross_profit": round(gross_profit, 2),
-        "gross_loss": round(gross_loss, 2),
+        "gross_profit_after_cap": round(gross_profit_after_cap, 2),
+        "gross_loss_after_cap": round(gross_loss_after_cap, 2),
+        "capped_win_count": capped_win_count,
+        "capped_loss_count": capped_loss_count,
         "profit_factor": round(profit_factor, 2),
         "max_drawdown": round(max_dd, 2),
         "max_dd_peak": round(max_dd_peak, 2),
@@ -270,114 +292,51 @@ def simulate(trades, config):
         "max_consec_loss": max_consec_loss,
         "max_single_loss": round(max_single_loss, 2),
         "top_10_losses": [round(x, 2) for x in top_losses],
-        "roi": round((balance - INITIAL_BALANCE) / INITIAL_BALANCE * 100, 1),
-        "roi_dd_ratio": round(((balance - INITIAL_BALANCE) / INITIAL_BALANCE * 100) / max_dd, 2) if max_dd > 0 else 0,
+        "roi": round(roi_pct, 1),
+        "roi_dd_ratio": round(roi_pct / max_dd, 2) if max_dd > 0 else 0,
         "monthly_pnl": {m: round(p, 2) for m, p in monthly_pnl.items()},
-        "skipped_by_loss_cap": skipped_by_loss_cap,
-        "loss_cap_savings": round(loss_cap_savings, 2),
     }
 
 
 def main():
+    if not V10_PATH.exists():
+        print(f"❌ 数据文件不存在: {V10_PATH}")
+        print("请先运行 python strategies/S10-v10/backtest.py 生成原始数据")
+        sys.exit(1)
+
     with open(V10_PATH) as f:
         raw = json.load(f).get("trades", [])
 
     print(f"v10原始数据: {len(raw)}笔")
 
-    # v11基础过滤
     base = apply_v11_base_filter(raw)
     print(f"v11基础过滤后: {len(base)}笔")
 
-    # ═══ 定义所有方案 ═══
-    schemes = {
-        "A-基线v11i": {
-            "desc": "v11i无改动",
-            "config": {"max_sl_pct": 10.0, "consec_loss_mult": 0.7, "max_loss_per_trade": None},
-        },
-        "B-SL≤8%": {
-            "desc": "仅收紧SL上限",
-            "config": {"max_sl_pct": 8.0, "consec_loss_mult": 0.7, "max_loss_per_trade": None},
-        },
-        "C-连亏×0.5": {
-            "desc": "仅加强连亏减仓",
-            "config": {"max_sl_pct": 10.0, "consec_loss_mult": 0.5, "max_loss_per_trade": None},
-        },
-        "D-单笔上限$60": {
-            "desc": "仅加单笔亏损上限",
-            "config": {"max_sl_pct": 10.0, "consec_loss_mult": 0.7, "max_loss_per_trade": 60},
-        },
-        "E-B+C": {
-            "desc": "SL≤8% + 连亏×0.5",
-            "config": {"max_sl_pct": 8.0, "consec_loss_mult": 0.5, "max_loss_per_trade": None},
-        },
-        "F-B+D": {
-            "desc": "SL≤8% + 上限$60",
-            "config": {"max_sl_pct": 8.0, "consec_loss_mult": 0.7, "max_loss_per_trade": 60},
-        },
-        "G-C+D": {
-            "desc": "连亏×0.5 + 上限$60",
-            "config": {"max_sl_pct": 10.0, "consec_loss_mult": 0.5, "max_loss_per_trade": 60},
-        },
-        "H-方案⑥(BCD)": {
-            "desc": "SL≤8% + 连亏×0.5 + 上限$60 ★主方案",
-            "config": {"max_sl_pct": 8.0, "consec_loss_mult": 0.5, "max_loss_per_trade": 60},
-        },
-        "I-加强版": {
-            "desc": "SL≤7% + 连亏×0.4 + 上限$50",
-            "config": {"max_sl_pct": 7.0, "consec_loss_mult": 0.4, "max_loss_per_trade": 50},
-        },
-        "J-宽松版": {
-            "desc": "SL≤9% + 连亏×0.6 + 上限$80",
-            "config": {"max_sl_pct": 9.0, "consec_loss_mult": 0.6, "max_loss_per_trade": 80},
-        },
-        "K-超保守": {
-            "desc": "SL≤6% + 连亏×0.3 + 上限$40",
-            "config": {"max_sl_pct": 6.0, "consec_loss_mult": 0.3, "max_loss_per_trade": 40},
-        },
-        "L-仅SL≤7%": {
-            "desc": "单独测SL=7%",
-            "config": {"max_sl_pct": 7.0, "consec_loss_mult": 0.7, "max_loss_per_trade": None},
-        },
-        "M-仅上限$40": {
-            "desc": "单独测上限$40",
-            "config": {"max_sl_pct": 10.0, "consec_loss_mult": 0.7, "max_loss_per_trade": 40},
-        },
-        "N-仅上限$80": {
-            "desc": "单独测上限$80",
-            "config": {"max_sl_pct": 10.0, "consec_loss_mult": 0.7, "max_loss_per_trade": 80},
-        },
-        "O-上限$100": {
-            "desc": "单独测上限$100",
-            "config": {"max_sl_pct": 10.0, "consec_loss_mult": 0.7, "max_loss_per_trade": 100},
-        },
-    }
-
-    # ═══ 运行所有方案 ═══
+    # ═══ 运行四个 Profile ═══
     results = {}
-    for name, scheme in schemes.items():
-        r = simulate(base, scheme["config"])
+    for pname, pconf in PROFILES.items():
+        r = simulate(base, pname, pconf)
         if r:
-            results[name] = {**r, "desc": scheme["desc"]}
+            results[pname] = {**r, "desc": pconf["desc"], "role": pconf["role"]}
         else:
-            results[name] = None
+            results[pname] = None
 
     # ═══ 输出对比表 ═══
-    print(f"\n{'='*120}")
-    print(f"全方案回测对比 (基于v11i参数, 初始$1000)")
-    print(f"{'='*120}")
+    print(f"\n{'='*130}")
+    print(f"v11j Profile 回测对比 (初始$1000, 基于v11i信号)")
+    print(f"{'='*130}")
 
-    # 表头
-    print(f"{'方案':<18} {'说明':<22} {'笔数':>5} {'WR%':>6} {'PnL($)':>10} {'ROI%':>8} {'DD%':>7} {'PF':>5} {'月胜率':>6} {'ROI/DD':>7} {'最大连亏':>7} {'单笔最大亏':>10}")
-    print("-" * 120)
+    print(f"{'Profile':<8} {'定位':<10} {'说明':<28} {'笔数':>5} {'WR%':>6} {'PnL($)':>10} {'ROI%':>8} {'DD%':>7} {'PF':>5} {'月胜率':>6} {'ROI/DD':>7} {'最大连亏':>7} {'单笔最大亏':>10} {'缩仓胜':>5} {'缩仓亏':>5}")
+    print("-" * 130)
 
-    for name, scheme in schemes.items():
-        r = results[name]
+    for pname in ["M40", "D60", "G60", "L7"]:
+        r = results[pname]
         if r is None:
-            print(f"{name:<18} {scheme['desc']:<22} {'N/A':>5}")
+            print(f"{pname:<8} {PROFILES[pname]['role']:<10} {PROFILES[pname]['desc']:<28} {'N/A':>5}")
             continue
 
         print(
-            f"{name:<18} {scheme['desc']:<22} "
+            f"{pname:<8} {r['role']:<10} {r['desc']:<28} "
             f"{r['total_trades']:>5} "
             f"{r['win_rate']:>5.1f}% "
             f"{r['total_pnl']:>+10.0f} "
@@ -387,112 +346,100 @@ def main():
             f"{r['monthly_win_rate']:>5.1f}% "
             f"{r['roi_dd_ratio']:>7.2f} "
             f"{r['max_consec_loss']:>7} "
-            f"{r['max_single_loss']:>+10.1f}"
+            f"{r['max_single_loss']:>+10.1f} "
+            f"{r['capped_win_count']:>5} "
+            f"{r['capped_loss_count']:>5}"
         )
 
-    # ═══ 详细分析 ═══
-    print(f"\n{'='*120}")
-    print("Top 5 最优方案 (按ROI/DD排序)")
-    print(f"{'='*120}")
+    # ═══ 关键对比: G60 vs D60 (验证连亏×0.5贡献) ═══
+    print(f"\n{'='*130}")
+    print("📊 关键对比: G60 vs D60 — 验证连亏减仓×0.5的真实贡献")
+    print(f"{'='*130}")
 
-    valid_results = [(n, r) for n, r in results.items() if r is not None]
-    valid_results.sort(key=lambda x: x[1]["roi_dd_ratio"], reverse=True)
+    if results["G60"] and results["D60"]:
+        g, d = results["G60"], results["D60"]
+        pnl_diff = g["total_pnl"] - d["total_pnl"]
+        dd_diff = g["max_drawdown"] - d["max_drawdown"]
+        rr_diff = g["roi_dd_ratio"] - d["roi_dd_ratio"]
+        cl_diff = g["max_consec_loss"] - d["max_consec_loss"]
 
-    for i, (name, r) in enumerate(valid_results[:5], 1):
-        print(f"\n  #{i} {name} ({r['desc']})")
-        print(f"      PnL: +${r['total_pnl']:.0f} | ROI: {r['roi']:.1f}% | DD: {r['max_drawdown']:.1f}% | ROI/DD: {r['roi_dd_ratio']:.2f}")
-        print(f"      WR: {r['win_rate']:.1f}% ({r['wins']}W/{r['losses']}L) | PF: {r['profit_factor']:.2f}")
-        print(f"      月胜率: {r['monthly_win_rate']:.1f}% ({r['profit_months']}/{r['total_months']}) | 最大连亏: {r['max_consec_loss']}笔")
-        print(f"      单笔最大亏: ${r['max_single_loss']:.1f} | DD区间: ${r['max_dd_peak']:.0f} → ${r['max_dd_trough']:.0f}")
-        print(f"      Top10亏损: {r['top_10_losses']}")
+        print(f"  G60 PnL: ${g['total_pnl']:+.0f} vs D60 PnL: ${d['total_pnl']:+.0f} → 差异: ${pnl_diff:+.0f}")
+        print(f"  G60 DD:  {g['max_drawdown']:.1f}% vs D60 DD:  {d['max_drawdown']:.1f}% → 差异: {dd_diff:+.1f}%")
+        print(f"  G60 ROI/DD: {g['roi_dd_ratio']:.2f} vs D60 ROI/DD: {d['roi_dd_ratio']:.2f} → 差异: {rr_diff:+.2f}")
+        print(f"  G60 最大连亏: {g['max_consec_loss']} vs D60 最大连亏: {d['max_consec_loss']} → 差异: {cl_diff:+d}")
 
-    # ═══ 月度对比 (基线 vs Top3) ═══
-    print(f"\n{'='*120}")
-    print("月度PnL对比 (基线A vs Top3)")
-    print(f"{'='*120}")
+        if pnl_diff > 0 and dd_diff < 0:
+            print(f"  ✅ 连亏×0.5 确实贡献了「收益增+DD降」的双赢效果")
+        elif pnl_diff > 0 and dd_diff > 0:
+            print(f"  ⚠️ 连亏×0.5 增加了收益，但DD也略增")
+        elif pnl_diff < 0:
+            print(f"  📉 连亏×0.5 反而减少了收益（缩仓过度）")
+        else:
+            print(f"  ➡️ 连亏×0.5 效果中性")
 
-    top3_names = [n for n, _ in valid_results[:3]]
-    compare_names = ["A-基线v11i"] + top3_names
+    # ═══ 关键对比: M40 vs G60 (安全底座 vs 主测) ═══
+    print(f"\n{'='*130}")
+    print("📊 关键对比: M40(风控底座) vs G60(主测) — 安全换收益的边际")
+    print(f"{'='*130}")
 
-    # 收集所有月份
+    if results["M40"] and results["G60"]:
+        m, g = results["M40"], results["G60"]
+        pnl_diff = g["total_pnl"] - m["total_pnl"]
+        dd_diff = g["max_drawdown"] - m["max_drawdown"]
+
+        print(f"  G60比M40多赚: ${pnl_diff:+.0f} ({pnl_diff/max(abs(m['total_pnl']),1)*100:+.1f}%)")
+        print(f"  G60比M40 DD变化: {dd_diff:+.1f}%")
+        print(f"  M40 单笔最大亏: ${m['max_single_loss']:.1f} | G60 单笔最大亏: ${g['max_single_loss']:.1f}")
+        print(f"  M40 最大连亏: {m['max_consec_loss']}笔 | G60 最大连亏: {g['max_consec_loss']}笔")
+
+    # ═══ 月度对比 ═══
+    print(f"\n{'='*130}")
+    print("月度PnL对比 (四个Profile)")
+    print(f"{'='*130}")
+
     all_months = set()
-    for n in compare_names:
-        if results[n]:
-            all_months.update(results[n]["monthly_pnl"].keys())
+    for pname in PROFILES:
+        if results[pname]:
+            all_months.update(results[pname]["monthly_pnl"].keys())
     all_months = sorted(all_months)
 
     header = f"{'月份':<10}"
-    for n in compare_names:
-        header += f" {n[:12]:>13}"
+    for pname in PROFILES:
+        header += f" {pname:>12}"
     print(header)
-    print("-" * (10 + 14 * len(compare_names)))
+    print("-" * (10 + 13 * len(PROFILES)))
 
-    for m in all_months:
-        row = f"{m:<10}"
-        for n in compare_names:
-            if results[n] and m in results[n]["monthly_pnl"]:
-                p = results[n]["monthly_pnl"][m]
-                row += f" {p:>+13.0f}"
+    for mo in all_months:
+        row = f"{mo:<10}"
+        for pname in PROFILES:
+            if results[pname] and mo in results[pname]["monthly_pnl"]:
+                p = results[pname]["monthly_pnl"][mo]
+                row += f" {p:>+12.0f}"
             else:
-                row += f" {'—':>13}"
+                row += f" {'—':>12}"
         print(row)
-
-    # ═══ 敏感性分析 ═══
-    print(f"\n{'='*120}")
-    print("敏感性分析: 各参数对PnL和DD的边际影响")
-    print(f"{'='*120}")
-
-    baseline_pnl = results["A-基线v11i"]["total_pnl"]
-    baseline_dd = results["A-基线v11i"]["max_drawdown"]
-
-    print(f"\n基线(A): PnL={baseline_pnl:+.0f} DD={baseline_dd:.1f}%\n")
-
-    singles = {
-        "SL≤8%": "B-SL≤8%",
-        "SL≤7%": "L-仅SL≤7%",
-        "连亏×0.5": "C-连亏×0.5",
-        "上限$40": "M-仅上限$40",
-        "上限$60": "D-单笔上限$60",
-        "上限$80": "N-仅上限$80",
-        "上限$100": "O-上限$100",
-    }
-
-    print(f"{'改动':<12} {'PnL变化':>10} {'DD变化':>10} {'PnL/DD':>10} {'评价':<20}")
-    print("-" * 65)
-    for label, name in singles.items():
-        r = results[name]
-        pnl_delta = r["total_pnl"] - baseline_pnl
-        dd_delta = r["max_drawdown"] - baseline_dd
-        # 改善评分: PnL增加+DD减少=好
-        score = pnl_delta / abs(dd_delta) if dd_delta != 0 else 0
-        if pnl_delta >= 0 and dd_delta <= 0:
-            verdict = "✅ 双赢"
-        elif pnl_delta >= 0 and dd_delta > 0:
-            verdict = "⚠️ 赚更多但DD也增"
-        elif pnl_delta < 0 and dd_delta < 0:
-            verdict = f"📉 亏${abs(pnl_delta):.0f}降DD"
-        else:
-            verdict = "❌ 双亏"
-
-        print(f"{label:<12} {pnl_delta:>+10.0f} {dd_delta:>+10.1f}% {score:>10.1f} {verdict:<20}")
 
     # ═══ 保存结果 ═══
     out = {
-        "version": "v11i-optimization-sweep",
-        "description": "v11i回撤优化全方案对比",
-        "baseline": "v11i: 1274笔/62.7%/+$6983/DD43.1%/PF1.42",
-        "schemes": {},
+        "version": "v11j-profile-comparison",
+        "description": "v11j Profile系统 M40/D60/G60/L7 四组对比",
+        "profiles": {},
     }
-    for name, scheme in schemes.items():
-        r = results[name]
+    for pname, pconf in PROFILES.items():
+        r = results[pname]
         if r:
-            out["schemes"][name] = {
-                "desc": scheme["desc"],
-                "config": scheme["config"],
-                "result": {k: v for k, v in r.items() if k != "monthly_pnl"},
+            out["profiles"][pname] = {
+                "desc": pconf["desc"],
+                "role": pconf["role"],
+                "config": {
+                    "max_loss_per_trade": pconf["max_loss_per_trade"],
+                    "consec_loss_mult": pconf["consec_loss_mult"],
+                    "max_sl_pct": pconf["max_sl_pct"],
+                },
+                "result": {k: v for k, v in r.items() if k not in ("monthly_pnl",)},
             }
 
-    out_path = DATA_DIR / "backtest_v11i_optimization_sweep.json"
+    out_path = DATA_DIR / "backtest_v11j_profiles.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2, default=str)
     print(f"\n📁 已保存: {out_path}")
