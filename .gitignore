@@ -1,0 +1,30 @@
+# 大文件数据
+*.pkl
+*.h5
+*.npy
+*.pickle
+*.feather
+*.parquet
+*.csv
+*.json
+
+# 日志/输出
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.out
+output/
+
+# 环境变量
+.env*
+*.env
+
+# 系统
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# 归档（保留引用，不保留数据本身）
+archive/
