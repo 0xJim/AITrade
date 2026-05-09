@@ -1563,6 +1563,23 @@ def main():
                 log(f"  v11i 参数未配置({e})，跳过V11I调整")
             except Exception as e:
                 log(f"  v11i 异常: {e}")
+            
+            # ═══ v11j新增: 单笔亏损上限 (方案M — 15方案回测碾压最优) ═══
+            # 回测: 1000U/1年，仅加此一项 → PnL +64%/DD -75%/月胜97.1%
+            # 逻辑: max_loss = pos_usd × sl_pct × leverage
+            #        若 max_loss > $40，缩小 pos_usd 使 max_loss = $40
+            try:
+                from config import MAX_LOSS_PER_TRADE
+                if MAX_LOSS_PER_TRADE and MAX_LOSS_PER_TRADE > 0:
+                    est_max_loss = pos_usd * sl_pct * LEVERAGE  # sl_pct是小数(如0.05)
+                    if est_max_loss > MAX_LOSS_PER_TRADE:
+                        original_pos = pos_usd
+                        pos_usd = round(MAX_LOSS_PER_TRADE / (sl_pct * LEVERAGE), 2)
+                        log(f"  v11j 单笔亏损上限: 估算亏损${est_max_loss:.1f}>${MAX_LOSS_PER_TRADE:.0f} → 缩仓 ${original_pos:.0f}→${pos_usd:.0f}")
+            except ImportError:
+                pass
+            except Exception as e:
+                log(f"  v11j 单笔亏损上限异常: {e}")
         else:
             score, env_detail = env_score(verified)
             log(f"候选 {verified['symbol']} [{verified['strength']}] {score}/12 | {env_detail}")
