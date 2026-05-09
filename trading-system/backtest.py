@@ -64,7 +64,7 @@ RSI_PERIOD = 14
 # 只保留强信号(env≥7)的加成
 POSITION_BOOST_HIGH_ENV = 1.2  # v9b: env_score≥7 → 仓位×1.2 (从1.3降低)
 POSITION_MAX_PCT = 0.20        # v9b: 仓位上限25%→20% (低ATR仓位已经够大)
-MAX_LOSS_PER_TRADE = 0.02      # v9b: 每笔最大亏损 = 余额的2% ($100)
+MAX_LOSS_PER_TRADE_FIXED = 40.0  # v11j: 每笔最大亏损固定$40 (取代余额%)
 
 # === v9 连亏处理 ===
 REVERSAL_CONFIRM_ENABLED = True
@@ -234,7 +234,7 @@ def calc_position_size(balance, sl_pct, leverage, env_score=0, atr_pct=0):
     v9b: 动态风险定仓 — 带最大亏损封顶
     基础: risk = balance × RISK_PER_TRADE
     强信号(env≥7): 仓位×1.2
-    最大亏损封顶: 每笔最多亏 balance × MAX_LOSS_PER_TRADE
+    最大亏损封顶: 每笔最多亏 $40 (固定值)
     """
     risk_usd = balance * RISK_PER_TRADE
     position_usd = risk_usd / (sl_pct * leverage)
@@ -244,7 +244,7 @@ def calc_position_size(balance, sl_pct, leverage, env_score=0, atr_pct=0):
         position_usd *= POSITION_BOOST_HIGH_ENV
     
     # v9b: 最大亏损封顶 — 确保即使止损也不超过限额
-    max_loss_usd = balance * MAX_LOSS_PER_TRADE
+    max_loss_usd = MAX_LOSS_PER_TRADE_FIXED  # v11j: 固定$40上限
     max_pos_by_loss = max_loss_usd / (sl_pct * leverage)
     position_usd = min(position_usd, max_pos_by_loss)
     
@@ -642,7 +642,7 @@ def run_backtest():
     print(f"时间: {START_TIME.strftime('%Y-%m-%d')} ~ {END_TIME.strftime('%Y-%m-%d')}")
     print(f"资金: ${INITIAL_BALANCE:.0f} | 杠杆: {LEVERAGE}x | 风险定仓: {RISK_PER_TRADE*100}%/笔")
     print(f"止损: 低ATR×{ATR_SL_MULTIPLIER_LOW}/高ATR×{ATR_SL_MULTIPLIER_HIGH}({MIN_SL_PCT*100}-{MAX_SL_PCT*100}%) | RR≥{MIN_RR_RATIO}")
-    print(f"ATR异常过滤: >{ATR_MAX_ALLOWED*100}%跳过 | 最大亏损封顶: {MAX_LOSS_PER_TRADE*100}%/笔")
+    print(f"ATR异常过滤: >{ATR_MAX_ALLOWED*100}%跳过 | 最大亏损封顶: ${MAX_LOSS_PER_TRADE_FIXED:.0f}/笔")
     print(f"同币种屏蔽: 累计亏{MAX_TOTAL_LOSS_PER_SYMBOL}次后永久不做")
     print(f"分批止盈: 到TP先平{PARTIAL_TP_RATIO*100:.0f}% | 移动止盈: {TRAILING_TP_TRIGGER*100}%→{TRAILING_TP_STEP*100}%回撤")
     print(f"趋势跟随: 盈利{TREND_TRAIL_TRIGGER*100}%后EMA9跟踪止损")
