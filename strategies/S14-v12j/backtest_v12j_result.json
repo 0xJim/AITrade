@@ -1,0 +1,173 @@
+{
+  "version": "v12j_comparison",
+  "results": {
+    "v11g(基线)": {
+      "total_trades": 1478,
+      "wins": 924,
+      "win_rate": 62.5,
+      "total_pnl": 1129.32,
+      "final_balance": 2129.32,
+      "return_pct": 112.9,
+      "max_drawdown": 15.34,
+      "profit_factor": 1.24,
+      "profit_months": 24,
+      "total_months": 34,
+      "long": {
+        "wins": 782,
+        "losses": 488,
+        "pnl": 915.6391836091178,
+        "count": 1270
+      },
+      "short": {
+        "wins": 142,
+        "losses": 66,
+        "pnl": 213.67644868658593,
+        "count": 208
+      }
+    },
+    "v12j-A": {
+      "total_trades": 618,
+      "wins": 409,
+      "win_rate": 66.2,
+      "total_pnl": 761.03,
+      "final_balance": 1761.03,
+      "return_pct": 76.1,
+      "max_drawdown": 9.26,
+      "profit_factor": 1.5,
+      "profit_months": 26,
+      "total_months": 34,
+      "long": {
+        "wins": 320,
+        "losses": 175,
+        "pnl": 596.7306366984036,
+        "count": 495
+      },
+      "short": {
+        "wins": 89,
+        "losses": 34,
+        "pnl": 164.2969395644279,
+        "count": 123
+      }
+    },
+    "v12j-B": {
+      "total_trades": 618,
+      "wins": 409,
+      "win_rate": 66.2,
+      "total_pnl": 761.03,
+      "final_balance": 1761.03,
+      "return_pct": 76.1,
+      "max_drawdown": 9.26,
+      "profit_factor": 1.5,
+      "profit_months": 26,
+      "total_months": 34,
+      "long": {
+        "wins": 320,
+        "losses": 175,
+        "pnl": 596.7306366984036,
+        "count": 495
+      },
+      "short": {
+        "wins": 89,
+        "losses": 34,
+        "pnl": 164.2969395644279,
+        "count": 123
+      }
+    },
+    "v12j-C": {
+      "total_trades": 618,
+      "wins": 409,
+      "win_rate": 66.2,
+      "total_pnl": 1125.16,
+      "final_balance": 2125.16,
+      "return_pct": 112.5,
+      "max_drawdown": 12.74,
+      "profit_factor": 1.52,
+      "profit_months": 27,
+      "total_months": 34,
+      "long": {
+        "wins": 320,
+        "losses": 175,
+        "pnl": 904.2317223746935,
+        "count": 495
+      },
+      "short": {
+        "wins": 89,
+        "losses": 34,
+        "pnl": 220.92957133007693,
+        "count": 123
+      }
+    },
+    "v12j-D": {
+      "total_trades": 618,
+      "wins": 409,
+      "win_rate": 66.2,
+      "total_pnl": 994.9,
+      "final_balance": 1994.9,
+      "return_pct": 99.5,
+      "max_drawdown": 9.03,
+      "profit_factor": 1.52,
+      "profit_months": 28,
+      "total_months": 34,
+      "long": {
+        "wins": 320,
+        "losses": 175,
+        "pnl": 759.1394540289411,
+        "count": 495
+      },
+      "short": {
+        "wins": 89,
+        "losses": 34,
+        "pnl": 235.76308273516142,
+        "count": 123
+      }
+    },
+    "v12j-E": {
+      "total_trades": 618,
+      "wins": 409,
+      "win_rate": 66.2,
+      "total_pnl": 565.23,
+      "final_balance": 1565.23,
+      "return_pct": 56.5,
+      "max_drawdown": 6.24,
+      "profit_factor": 1.47,
+      "profit_months": 25,
+      "total_months": 34,
+      "long": {
+        "wins": 320,
+        "losses": 175,
+        "pnl": 474.99303576417196,
+        "count": 495
+      },
+      "short": {
+        "wins": 89,
+        "losses": 34,
+        "pnl": 90.23817033093286,
+        "count": 123
+      }
+    },
+    "v12j-F": {
+      "total_trades": 618,
+      "wins": 409,
+      "win_rate": 66.2,
+      "total_pnl": 1015.27,
+      "final_balance": 2015.27,
+      "return_pct": 101.5,
+      "max_drawdown": 10.24,
+      "profit_factor": 1.55,
+      "profit_months": 28,
+      "total_months": 34,
+      "long": {
+        "wins": 320,
+        "losses": 175,
+        "pnl": 666.0240000000015,
+        "count": 495
+      },
+      "short": {
+        "wins": 89,
+        "losses": 34,
+        "pnl": 349.25000000000045,
+        "count": 123
+      }
+    }
+  }
+}
