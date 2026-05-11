@@ -142,24 +142,25 @@ def format_open_message(trade: dict, env_detail: str = "") -> str:
     rr = trade.get("signal_rr", 0)
     
     # 止损逻辑说明
-    atr_pct = tech.get("atr_pct", 0)
-    if atr_pct > 0:
-        sl_logic = f"ATR动态止损: ATR={atr_pct:.2f}% × 1.5倍 = SL{sl_pct:.1f}%"
+    # atr_pct: 小数形式内部使用，atr_pct_percent: 展示用
+    atr_pct_percent = tech.get("atr_pct_percent", tech.get("atr_pct", 0) * 100)
+    if atr_pct_percent > 0:
+        sl_logic = f"ATR动态止损: ATR={atr_pct_percent:.2f}% × 1.5倍 = SL{sl_pct:.1f}%"
     else:
         sl_logic = f"固定止损{sl_pct:.1f}%"
-    
+
     if trade["direction"] == "long":
         sl_detail = f"跌破{sl} → 跌{sl_pct:.1f}% 说明反弹失败\n  {sl_logic}"
         tp_detail = f"涨到{tp} → 涨{tp_pct:.1f}% 反弹到位获利 (RR={rr:.1f})"
     else:
         sl_detail = f"涨破{sl} → 涨{sl_pct:.1f}% 说明空头力量不足\n  {sl_logic}"
         tp_detail = f"跌到{tp} → 跌{tp_pct:.1f}% 回调到位获利 (RR={rr:.1f})"
-    
+
     # 技术指标详情
     tech_detail = (
         f"  EMA趋势: {tech.get('ema_trend', 'N/A')}\n"
         f"  RSI(14): {tech.get('rsi', 50):.1f}\n"
-        f"  ATR(%): {atr_pct:.3f}%"
+        f"  ATR(%): {atr_pct_percent:.3f}%"
     )
     
     # ══════════════════════════════════
@@ -435,12 +436,13 @@ def format_review_message(trade: dict) -> str:
 
     tech_summary = ""
     if tech:
+        atr_pct_percent = tech.get("atr_pct_percent", tech.get("atr_pct", 0) * 100)
         tech_summary = (
             f"\n"
             f"📉 技术指标(开仓时):\n"
             f"  EMA趋势: {tech.get('ema_trend', 'N/A')}\n"
             f"  RSI: {tech.get('rsi', 50):.1f}\n"
-            f"  ATR%: {tech.get('atr_pct', 0):.3f}%\n"
+            f"  ATR%: {atr_pct_percent:.3f}%\n"
         )
 
     msg = (

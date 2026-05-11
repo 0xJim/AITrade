@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """
-v11j 方案M 回测对比: 1年 vs 1000天
-方案M: 仅加单笔亏损上限$40 (其余v11i参数不变)
-基于v10原始数据 + v11i过滤/仓位参数
+v11j 参数扫描 — MAX_LOSS_PER_TRADE 和 equity_pct_loss_cap 组合
+基于 v10 原始数据，测试不同参数组合的效果
+
+MAX_LOSS_PER_TRADE: 30, 40, 50, 60 (单笔亏损上限 USDT)
+equity_pct_loss_cap: 0.6%, 0.8%, 1.0% (按当前权益计算的单笔风险上限)
+
+输出对比表，按 ROI/DD、PF、月胜率、最大单亏排序
 """
 import json
 import sys
@@ -50,15 +54,13 @@ MAX_SL_PCT_BASE = 10.0
 MAX_ATR_PCT = 5.0
 FILTER_V8_RSI = True
 CONSEC_LOSS_THRESHOLD = 2
-CONSEC_LOSS_MULT = 0.7
-
-# 方案M参数
-MAX_LOSS_PER_TRADE = 40  # 单笔亏损上限$40
+CONSEC_LOSS_MULT_BASE = 0.7
 
 
 def get_rsi(t):
     ts = t.get("tech_snapshot", {})
     return ts.get("rsi") if isinstance(ts, dict) else None
+
 
 def get_atr_pct(t):
     ts = t.get("tech_snapshot", {})
@@ -123,20 +125,22 @@ def calc_mult(trade, consec_losses):
         m *= SL_WIDE_MULT
 
     if consec_losses >= CONSEC_LOSS_THRESHOLD:
-        m *= CONSEC_LOSS_MULT
+        m *= CONSEC_LOSS_MULT_BASE
 
     return m
 
 
-def simulate(trades, max_loss_per_trade=MAX_LOSS_PER_TRADE):
-    """方案M: 仅加单笔亏损上限"""
+def simulate(trades, max_loss_per_trade=40, equity_pct_loss_cap=None):
+    """
+    模拟交易
+    max_loss_per_trade: 单笔最大亏损 (USDT)
+    equity_pct_loss_cap: 当前权益百分比风险上限 (如 0.8 表示每笔最多风险权益0.8%)
+    """
     filtered = apply_hard_filters(trades)
 
     balance = INITIAL_BALANCE
     peak = balance
     max_dd = 0
-    max_dd_peak = balance
-    max_dd_trough = balance
     consec = 0
     adj = []
     monthly = defaultdict(list)
@@ -153,16 +157,23 @@ def simulate(trades, max_loss_per_trade=MAX_LOSS_PER_TRADE):
 
         raw_pnl = t.get("pnl_usd", 0)
 
-        # 开仓前缩仓: 只用开仓时已知的仓位、止损、杠杆估算风险。
-        # 盈利单和亏损单按同一 shrink_ratio 缩放，避免“只截亏损、保留盈利”的未来函数。
+        # 单笔风险上限: 开仓前估算风险并缩仓，盈亏同倍数缩放。
+        # 固定USDT上限与权益百分比上限同时存在时取更小值。
+        effective_cap = None
         if max_loss_per_trade is not None:
+            effective_cap = max_loss_per_trade
+        if equity_pct_loss_cap is not None:
+            equity_cap = balance * equity_pct_loss_cap / 100
+            effective_cap = equity_cap if effective_cap is None else min(effective_cap, equity_cap)
+
+        if effective_cap is not None:
             pos_usd = t.get("position_usd", 0)
             sl_pct = t.get("signal_sl_pct", 0)
             lev = t.get("leverage", 3)
             est_risk = pos_usd * sl_pct * lev * mult
-            if est_risk > max_loss_per_trade:
-                shrink_ratio = max_loss_per_trade / est_risk
-                loss_cap_savings += est_risk - max_loss_per_trade
+            if est_risk > effective_cap:
+                shrink_ratio = effective_cap / est_risk
+                loss_cap_savings += est_risk - effective_cap
                 mult *= shrink_ratio
                 if raw_pnl > 0:
                     capped_win_count += 1
@@ -172,13 +183,12 @@ def simulate(trades, max_loss_per_trade=MAX_LOSS_PER_TRADE):
         pnl = raw_pnl * mult
 
         balance += pnl
+
         peak = max(peak, balance)
         dd = (peak - balance) / peak * 100 if peak > 0 else 0
 
         if dd > max_dd:
             max_dd = dd
-            max_dd_peak = peak
-            max_dd_trough = balance
 
         if pnl > 0:
             gross_profit += pnl
@@ -220,7 +230,6 @@ def simulate(trades, max_loss_per_trade=MAX_LOSS_PER_TRADE):
             current_consec = 0
 
     max_single_loss = min(t["pnl_usd"] for t in adj)
-    top_10_losses = sorted([t["pnl_usd"] for t in adj])[:10]
 
     return {
         "total_trades": total_trades,
@@ -233,16 +242,13 @@ def simulate(trades, max_loss_per_trade=MAX_LOSS_PER_TRADE):
         "gross_loss": round(gross_loss, 2),
         "profit_factor": round(profit_factor, 2),
         "max_drawdown": round(max_dd, 2),
-        "max_dd_peak": round(max_dd_peak, 2),
-        "max_dd_trough": round(max_dd_trough, 2),
         "profit_months": profit_months,
         "total_months": total_months,
         "monthly_win_rate": round(profit_months / total_months * 100, 1) if total_months > 0 else 0,
         "max_consec_loss": max_consec_loss,
         "max_single_loss": round(max_single_loss, 2),
-        "top_10_losses": [round(x, 2) for x in top_10_losses],
         "roi": round((balance - INITIAL_BALANCE) / INITIAL_BALANCE * 100, 1),
-        "roi_dd_ratio": round((balance - INITIAL_BALANCE) / INITIAL_BALANCE / max_dd * 100, 1) if max_dd > 0 else 0,
+        "roi_dd_ratio": round(((balance - INITIAL_BALANCE) / INITIAL_BALANCE * 100) / max_dd, 2) if max_dd > 0 else 0,
         "loss_cap_savings": round(loss_cap_savings, 2),
         "capped_win_count": capped_win_count,
         "capped_loss_count": capped_loss_count,
@@ -260,89 +266,132 @@ def main():
     print(f"  原始交易: {len(all_trades)} 笔")
 
     # v11i基础过滤
-    filtered = apply_v11_base_filter(all_trades)
-    print(f"  v11i过滤后: {len(filtered)} 笔")
+    base = apply_v11_base_filter(all_trades)
+    print(f"v11i基础过滤后: {len(base)} 笔")
 
-    # 按时间段分割
-    one_year_cutoff = "2025-05-09"
-    trades_1yr = [t for t in filtered if t.get("entry_time", "") >= one_year_cutoff]
-    trades_1yr_early = [t for t in filtered if t.get("entry_time", "") < one_year_cutoff]
+    # ═══ 参数组合 ═══
+    max_loss_values = [30, 40, 50, 60]
+    equity_cap_values = [None, 0.6, 0.8, 1.0]  # None 表示不限制
 
-    print(f"\n时间段分割:")
-    print(f"  1年 (2025-05-09~): {len(trades_1yr)} 笔")
-    print(f"  前2年 (2023-08~2025-05): {len(trades_1yr_early)} 笔")
-    print(f"  总计 (1000天): {len(filtered)} 笔")
+    results = {}
 
-    # 跑方案M
-    print("\n" + "="*60)
-    print("方案M: 单笔亏损上限$40")
-    print("="*60)
+    print("\n" + "=" * 80)
+    print("v11j 参数扫描 — MAX_LOSS_PER_TRADE × equity_pct_loss_cap(单笔权益风险)")
+    print("=" * 80)
 
-    r_1yr = simulate(trades_1yr)
-    r_1000d = simulate(filtered)
+    for max_loss in max_loss_values:
+        for equity_cap in equity_cap_values:
+            key = f"max_loss={max_loss}"
+            if equity_cap is not None:
+                key += f"_cap={equity_cap}%"
 
-    print("\n┌─────────────────────────────────────────────────────┐")
-    print("│           v11j 方案M 对比报告                        │")
-    print("├──────────────────┬──────────────┬───────────────────-─┤")
-    print("│ 指标             │ 1年          │ 1000天              │")
-    print("├──────────────────┼──────────────┼─────────────────────┤")
+            print(f"\n扫描 {key}...")
+            r = simulate(base, max_loss_per_trade=max_loss, equity_pct_loss_cap=equity_cap)
+            if r:
+                r["config"] = {
+                    "max_loss_per_trade": max_loss,
+                    "equity_pct_loss_cap": equity_cap,
+                }
+                results[key] = r
 
-    def row(label, v1, v2, fmt="{}"):
-        print(f"│ {label:<16} │ {fmt.format(v1):<12} │ {fmt.format(v2):<19} │")
+    # ═══ 输出对比表 ═══
+    print("\n" + "=" * 120)
+    print(f"{'方案':<25} {'笔数':>5} {'WR%':>6} {'PnL($)':>10} {'ROI%':>8} {'DD%':>7} {'PF':>5} {'月胜率':>7} {'ROI/DD':>8} {'最大连亏':>7} {'单笔最大亏':>10}")
+    print("-" * 120)
 
-    row("交易笔数", r_1yr["total_trades"], r_1000d["total_trades"])
-    row("胜率", f'{r_1yr["win_rate"]}%', f'{r_1000d["win_rate"]}%')
-    row("总盈亏", f'${r_1yr["total_pnl"]}', f'${r_1000d["total_pnl"]}')
-    row("最终余额", f'${r_1yr["final_balance"]}', f'${r_1000d["final_balance"]}')
-    row("盈利因子PF", r_1yr["profit_factor"], r_1000d["profit_factor"])
-    row("最大回撤", f'{r_1yr["max_drawdown"]}%', f'{r_1000d["max_drawdown"]}%')
-    row("月胜率", f'{r_1yr["monthly_win_rate"]}%', f'{r_1000d["monthly_win_rate"]}%')
-    row("盈利月/总月", f'{r_1yr["profit_months"]}/{r_1yr["total_months"]}',
-        f'{r_1000d["profit_months"]}/{r_1000d["total_months"]}')
-    row("ROI", f'{r_1yr["roi"]}%', f'{r_1000d["roi"]}%')
-    row("ROI/DD比", r_1yr["roi_dd_ratio"], r_1000d["roi_dd_ratio"])
-    row("单笔最大亏", f'${r_1yr["max_single_loss"]}', f'${r_1000d["max_single_loss"]}')
-    row("最大连亏", r_1yr["max_consec_loss"], r_1000d["max_consec_loss"])
-    row("亏损上限省", f'${r_1yr["loss_cap_savings"]}', f'${r_1000d["loss_cap_savings"]}')
+    # 按ROI/DD排序
+    sorted_results = sorted(results.items(), key=lambda x: x[1]["roi_dd_ratio"], reverse=True)
 
-    print("├──────────────────┴──────────────┴─────────────────────┤")
+    for key, r in sorted_results:
+        max_loss = r["config"]["max_loss_per_trade"]
+        equity_cap = r["config"]["equity_pct_loss_cap"]
+        label = f"L${max_loss}"
+        if equity_cap is not None:
+            label += f" E{equity_cap}%"
 
-    # 月度对比
-    print("│ 1年月度盈亏:                                         │")
-    for m, p in sorted(r_1yr["monthly_pnl"].items()):
-        flag = "✓" if p > 0 else "✗"
-        print(f"│   {m}: ${p:>8} {flag}                                  │")
+        print(
+            f"{label:<25} "
+            f"{r['total_trades']:>5} "
+            f"{r['win_rate']:>5.1f}% "
+            f"{r['total_pnl']:>+10.0f} "
+            f"{r['roi']:>+8.1f} "
+            f"{r['max_drawdown']:>6.1f}% "
+            f"{r['profit_factor']:>5.2f} "
+            f"{r['monthly_win_rate']:>6.1f}% "
+            f"{r['roi_dd_ratio']:>8.2f} "
+            f"{r['max_consec_loss']:>7} "
+            f"${r['max_single_loss']:>+9.1f}"
+        )
 
-    print("│ 1000天前2年月度 (方案M前半段):                       │")
-    # 计算前半段
-    r_early = simulate(trades_1yr_early)
-    if r_early:
-        for m, p in sorted(r_early["monthly_pnl"].items()):
-            flag = "✓" if p > 0 else "✗"
-            print(f"│   {m}: ${p:>8} {flag}                                  │")
-        print(f"│   前2年汇总: {r_early['total_trades']}笔/"
-              f'{r_early["win_rate"]}%/'
-              f'${r_early["total_pnl"]}/'
-              f'DD{r_early["max_drawdown"]}%                          │')
+    # ═══ Top 5 详细分析 ═══
+    print("\n" + "=" * 120)
+    print("Top 5 最优方案 (按ROI/DD排序)")
+    print("=" * 120)
 
-    print("└──────────────────────────────────────────────────────┘")
+    for i, (key, r) in enumerate(sorted_results[:5], 1):
+        max_loss = r["config"]["max_loss_per_trade"]
+        equity_cap = r["config"]["equity_pct_loss_cap"]
+        label = f"L${max_loss}"
+        if equity_cap is not None:
+            label += f" E{equity_cap}%"
 
-    # 保存结果
-    result = {
-        "version": "v11j-compare",
-        "scheme_M": {
-            "config": {"max_loss_per_trade": 40, "desc": "单笔亏损上限$40"},
-        },
-        "1year": r_1yr,
-        "1000days": r_1000d,
+        print(f"\n  #{i} {label}")
+        print(f"      PnL: +${r['total_pnl']:.0f} | ROI: {r['roi']:.1f}% | DD: {r['max_drawdown']:.1f}% | ROI/DD: {r['roi_dd_ratio']:.2f}")
+        print(f"      WR: {r['win_rate']:.1f}% ({r['wins']}W/{r['losses']}L) | PF: {r['profit_factor']:.2f}")
+        print(f"      月胜率: {r['monthly_win_rate']:.1f}% ({r['profit_months']}/{r['total_months']}) | 最大连亏: {r['max_consec_loss']}笔")
+        print(f"      单笔最大亏: ${r['max_single_loss']:.1f} | 亏损上限节省: ${r['loss_cap_savings']:.2f}")
+
+    # ═══ 按不同指标排序的对比 ═══
+    print("\n" + "=" * 120)
+    print("按不同指标排序的 Top 3")
+    print("=" * 120)
+
+    # 按PF排序
+    pf_sorted = sorted(results.items(), key=lambda x: x[1]["profit_factor"], reverse=True)
+    print("\n按盈利因子PF排序:")
+    for i, (key, r) in enumerate(pf_sorted[:3], 1):
+        max_loss = r["config"]["max_loss_per_trade"]
+        equity_cap = r["config"]["equity_pct_loss_cap"]
+        label = f"L${max_loss}"
+        if equity_cap is not None:
+            label += f" E{equity_cap}%"
+        print(f"  #{i} {label}: PF={r['profit_factor']:.2f} ROI/DD={r['roi_dd_ratio']:.2f}")
+
+    # 按月胜率排序
+    wr_sorted = sorted(results.items(), key=lambda x: x[1]["monthly_win_rate"], reverse=True)
+    print("\n按月胜率排序:")
+    for i, (key, r) in enumerate(wr_sorted[:3], 1):
+        max_loss = r["config"]["max_loss_per_trade"]
+        equity_cap = r["config"]["equity_pct_loss_cap"]
+        label = f"L${max_loss}"
+        if equity_cap is not None:
+            label += f" E{equity_cap}%"
+        print(f"  #{i} {label}: 月胜率={r['monthly_win_rate']:.1f}% ROI/DD={r['roi_dd_ratio']:.2f}")
+
+    # 按最大单亏排序（越小越好）
+    loss_sorted = sorted(results.items(), key=lambda x: x[1]["max_single_loss"], reverse=True)
+    print("\n按最大单亏排序（绝对值越小越好）:")
+    for i, (key, r) in enumerate(loss_sorted[:3], 1):
+        max_loss = r["config"]["max_loss_per_trade"]
+        equity_cap = r["config"]["equity_pct_loss_cap"]
+        label = f"L${max_loss}"
+        if equity_cap is not None:
+            label += f" E{equity_cap}%"
+        print(f"  #{i} {label}: 最大单亏=${r['max_single_loss']:.1f} ROI/DD={r['roi_dd_ratio']:.2f}")
+
+    # ═══ 保存结果 ═══
+    out = {
+        "version": "v11j-param-sweep",
+        "description": "v11j参数扫描: MAX_LOSS_PER_TRADE × equity_pct_loss_cap(单笔权益风险)",
+        "results": {k: {"config": v["config"], **{kk: vv for kk, vv in v.items() if kk != "config" and kk != "monthly_pnl"}}
+                     for k, v in results.items()},
     }
-    if r_early:
-        result["first_2years"] = r_early
 
-    out_path = Path(__file__).parent / "backtest_v11j_compare.json"
-    with open(out_path, "w") as f:
-        json.dump(result, f, indent=2, ensure_ascii=False)
-    print(f"\n结果已保存到 {out_path}")
+    out_path = Path(__file__).parent / "backtest_v11j_param_sweep.json"
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=2, default=str)
+    print(f"\n📁 已保存: {out_path}")
+    print("=" * 120)
 
 
 if __name__ == "__main__":

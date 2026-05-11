@@ -21,3 +21,8 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Generated backtest data
+trading-system/data/backtest_reports/
+trading-system/data/backtest_cache/
+trading-system/data/*.jsonl
