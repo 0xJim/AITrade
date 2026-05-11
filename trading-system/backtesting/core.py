@@ -24,7 +24,7 @@ MS_HOUR = 60 * 60 * 1000
 def interval_to_ms(interval: str) -> int:
     """
     将K线周期转换为毫秒
-    支持: 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 1w
+    支持: 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 1w, 1M
     """
     unit = interval[-1]
     value = int(interval[:-1]) if len(interval) > 1 else 1
@@ -34,7 +34,10 @@ def interval_to_ms(interval: str) -> int:
         "h": 60 * 60 * 1000,
         "d": 24 * 60 * 60 * 1000,
         "w": 7 * 24 * 60 * 60 * 1000,
+        "M": 30 * 24 * 60 * 60 * 1000,
     }
+    if unit not in units_ms:
+        raise ValueError(f"Unsupported interval: {interval}")
     return value * units_ms[unit]
 
 

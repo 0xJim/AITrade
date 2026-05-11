@@ -528,8 +528,8 @@ def v8_calc_weights(cand: dict, tech: dict, btc_trend: dict) -> tuple:
     # 成交量确认
     if vol > 200_000_000: pv_score += 1
     elif vol < 50_000_000: pv_score -= 1
-    # ATR适中加分
-    if 0.5 < atr_pct < 5: pv_score += 1
+    # ATR适中加分 (小数形式: 0.005 = 0.5%, 0.05 = 5%)
+    if 0.005 < atr_pct < 0.05: pv_score += 1
     # 映射到±25
     scores["pv"] = max(-25, min(25, int(pv_score * 5)))
     details.append(f"量价:{scores['pv']:+d}")
@@ -633,8 +633,8 @@ def v8_signal_quality(cand: dict, tech: dict) -> float:
     if vol > 200_000_000: pv += 10
     elif vol > 100_000_000: pv += 5
     elif vol < 50_000_000: pv -= 5
-    # ATR适中加分
-    if 0.5 < atr_pct < 5: pv += 5
+    # ATR适中加分 (小数形式: 0.005 = 0.5%, 0.05 = 5%)
+    if 0.005 < atr_pct < 0.05: pv += 5
     pv = max(0, min(40, pv))
     
     # 2. 形态识别 (30分) — v8完整形态识别

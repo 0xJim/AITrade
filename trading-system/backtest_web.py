@@ -5,7 +5,8 @@ import argparse
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from typing import Any
+from urllib.parse import urlparse
 
 from backtesting.core import (
     BinanceFuturesDataProvider,
@@ -161,15 +162,19 @@ async function runBacktest(ev) {
   ev.preventDefault();
   const btn = $("runBtn");
   const data = new FormData(ev.target);
-  const qs = new URLSearchParams(data);
+  const payload = Object.fromEntries(data.entries());
   btn.disabled = true;
   $("status").textContent = "运行中...";
   try {
-    const res = await fetch(`/api/run?${qs.toString()}`);
-    const payload = await res.json();
-    if (!res.ok) throw new Error(payload.error || "run failed");
-    render(payload);
-    $("status").textContent = `完成，报告已保存：${payload.report_path || "latest.json"}`;
+    const res = await fetch("/api/run", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+    const resp = await res.json();
+    if (!res.ok) throw new Error(resp.error || "run failed");
+    render(resp);
+    $("status").textContent = `完成，报告已保存：${resp.report_path || "latest.json"}`;
   } catch (err) {
     $("status").textContent = err.message;
   } finally {
@@ -218,7 +223,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(HTML.encode(), "text/html; charset=utf-8")
             return
         if parsed.path == "/api/run":
-            self.run_backtest(parse_qs(parsed.query))
+            self._json({"error": "use POST /api/run"}, 405)
             return
         if parsed.path == "/api/report/latest":
             self.latest_report()
@@ -261,6 +266,36 @@ class Handler(BaseHTTPRequestHandler):
         reports = sorted(REPORT_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
         self._json({"reports": [str(p) for p in reports if p.name != "latest.json"]})
 
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path != "/api/run":
+            self._json({"error": "not found"}, 404)
+            return
+
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        body = self.rfile.read(length).decode("utf-8") if length else "{}"
+        payload = json.loads(body or "{}")
+        self.run_backtest_payload(payload)
+
+    def run_backtest_payload(self, payload: dict[str, Any]) -> None:
+        try:
+            source = payload.get("source", "sample")
+            days = max(1, min(int(payload.get("days", 90)), 1200))
+            symbols_text = payload.get("symbols", "")
+            strategy_text = payload.get("strategy", str(DEFAULT_STRATEGY))
+            strategy_path = resolve_strategy_path(strategy_text)
+            strategy = load_strategy(strategy_path)
+            provider = SampleDataProvider() if source == "sample" else BinanceFuturesDataProvider()
+            symbols = [s.strip().upper() for s in symbols_text.split(",") if s.strip()] or None
+            if symbols:
+                symbols = symbols[:50]
+            report = UniversalBacktester(strategy, provider).run(symbols=symbols, days=days)
+            path = save_report(report, REPORT_DIR)
+            report["report_path"] = str(path)
+            self._json(report)
+        except Exception as exc:
+            self._json({"error": str(exc)}, 500)
+
 
 def one(query: dict[str, list[str]], key: str, default: str) -> str:
     values = query.get(key)
@@ -271,20 +306,18 @@ def resolve_strategy_path(value: str) -> Path:
     raw = Path(value).expanduser()
     path = raw if raw.is_absolute() else (BASE_DIR / raw)
     path = path.resolve()
-    # 安全限制：策略文件必须在 configs 目录下
+
     configs_dir = (BASE_DIR / "configs").resolve()
     try:
-        # 检查路径是否在 configs 目录下（或就是 configs 目录）
-        path_relative_to_base = path.relative_to(BASE_DIR)
-        # 只允许 configs 目录下的文件
-        if not str(path_relative_to_base).startswith("configs"):
-            raise ValueError("策略文件必须在 trading-system/configs 目录下")
-        if path.suffix != ".json":
-            raise ValueError("策略文件必须是 JSON 格式")
+        path.relative_to(configs_dir)
     except ValueError:
-        raise
-    except Exception:
-        raise ValueError("策略文件路径无效")
+        raise ValueError("策略文件必须在 trading-system/configs 目录下")
+
+    if path.suffix != ".json":
+        raise ValueError("策略文件必须是 JSON 格式")
+    if not path.exists():
+        raise ValueError("策略文件不存在")
+
     return path
 
 

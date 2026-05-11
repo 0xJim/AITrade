@@ -2,19 +2,28 @@
 review_db.py — v8复盘数据库模块
 基于okx-review skill精简适配到交易系统
 
-存储: ~/.hermes/trading/data/review.db (SQLite)
+存储: 项目内 data/review.db (可通过 REVIEW_DB_PATH 环境变量覆盖)
 表:
 - trades: 交易记录快照(从trades.json同步)
 - tags: 自定义标签 (trade_id, tag)
 - notes: 复盘笔记 (trade_id, content, created_at)
 """
 
+import os
 import sqlite3
 import json
 from pathlib import Path
 from datetime import datetime
 
-REVIEW_DB_PATH = Path.home() / ".hermes" / "trading" / "data" / "review.db"
+# 优先使用环境变量，其次使用项目内 data/review.db
+try:
+    from config import DATA_DIR
+except Exception:
+    DATA_DIR = Path(__file__).parent / "data"
+
+REVIEW_DB_PATH = Path(
+    os.environ.get("REVIEW_DB_PATH", str(DATA_DIR / "review.db"))
+).expanduser()
 
 
 def get_conn():
@@ -22,7 +31,10 @@ def get_conn():
     REVIEW_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(REVIEW_DB_PATH))
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+    except sqlite3.OperationalError:
+        conn.execute("PRAGMA journal_mode=DELETE")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
@@ -239,5 +251,6 @@ def get_trade_detail(trade_id: str) -> dict:
     return detail
 
 
-# 初始化
-init_db()
+# 延迟初始化：可通过环境变量禁用
+if os.environ.get("REVIEW_DB_DISABLE_AUTO_INIT", "false").lower() != "true":
+    init_db()

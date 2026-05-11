@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """
-回测脚本 v11j — 基于 v11i + 单笔亏损上限
+[DEPRECATED] 回测脚本 v11j — 基于 v11i + 单笔亏损上限
+
+⚠️ Deprecated research script. Do not use as the primary comparable backtest engine.
+Use trading-system/universal_backtest.py + trading-system/configs/*.json for new comparisons.
+
+This script is retained for historical research reproduction only.
+
 读取 config.py 的 v11i/v11j 参数，复用 S22 规则进行回测
 
 方案M(仅单笔风险上限$40): 1000天/1274笔 胜率62.7% PnL +$4011 DD 16.46%
@@ -482,8 +488,8 @@ def calculate_v8_score(candidate, tech):
         elif rsi < 35:
             score -= 1
 
-    # ATR 适中
-    if 0.5 < atr_pct < 5:
+    # ATR 适中 (小数形式: 0.005 = 0.5%, 0.05 = 5%)
+    if 0.005 < atr_pct < 0.05:
         score += 1
 
     # 信号强度

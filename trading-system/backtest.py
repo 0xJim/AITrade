@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """
-回测脚本 v10c — 数据驱动优化版
+[DEPRECATED] 回测脚本 v10c — 数据驱动优化版
+
+⚠️ Deprecated research script. Do not use as the primary comparable backtest engine.
+Use trading-system/universal_backtest.py + trading-system/configs/*.json for new comparisons.
+
+This script is retained for historical research reproduction only.
+
 基于v10b(39笔/+$958/19.2%)深度分析:
 - SL 3-4%区间: 9W/1L 胜率90%赚$646 → 蓄势突破强制SL=3-4%
 - 做空71%胜率赚$663 vs 做多45%赚$295 → 做多env门槛+2
