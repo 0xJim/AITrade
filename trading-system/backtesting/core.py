@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from requests import RequestException
 
 try:
     from config import DATA_FAPI
@@ -94,12 +95,20 @@ class BinanceFuturesDataProvider:
         self.sleep_s = sleep_s
 
     def _get(self, endpoint: str, params: dict[str, Any] | None = None) -> Any:
-        resp = requests.get(f"{self.base_url}{endpoint}", params=params or {}, timeout=20)
-        if resp.status_code == 429:
-            time.sleep(2)
-            resp = requests.get(f"{self.base_url}{endpoint}", params=params or {}, timeout=20)
-        resp.raise_for_status()
-        return resp.json()
+        url = f"{self.base_url}{endpoint}"
+        try:
+            resp = requests.get(url, params=params or {}, timeout=20)
+            if resp.status_code == 429:
+                time.sleep(2)
+                resp = requests.get(url, params=params or {}, timeout=20)
+            resp.raise_for_status()
+            return resp.json()
+        except RequestException as exc:
+            raise RuntimeError(
+                f"Binance public data request failed: {url}; "
+                f"check network/proxy/firewall or set BINANCE_DATA_FAPI. "
+                f"Original error: {exc}"
+            ) from exc
 
     def list_symbols(self, limit: int, min_quote_volume: float, exclude: set[str]) -> list[str]:
         data = self._get("/fapi/v1/ticker/24hr")

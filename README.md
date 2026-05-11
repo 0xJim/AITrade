@@ -127,6 +127,16 @@ AITrade/
 | `universal_backtest.py` | 通用参数化回测入口(JSON策略变量 + 统一模拟引擎) |
 | `backtest_web.py` | 本地网页回测看板 |
 
+## ✅ 当前验证状态
+
+- 本地 Python 编译通过
+- `cron_scan` 主入口可导入
+- `review_db` 可导入（项目内 `data/review.db`）
+- sample 通用回测通过（30天 BTC/ETH，40笔，ROI 14.6%）
+- L7 profile 不崩溃（`MAX_LOSS_PER_TRADE=None`）
+- Binance production public data 需要在可访问 fapi.binance.com 的网络环境验证
+- testnet/live 前必须先确认 `DATA_FAPI` 与 `TRADE_FAPI` 分离
+
 ## 🧪 通用回测系统
 
 核心修正：行情数据源和交易下单源已拆开。`DATA_FAPI` 默认读取币安正式合约公开行情，`TRADE_FAPI` 按 `BINANCE_TESTNET` 切模拟盘或实盘签名接口，避免“回测用正式行情、模拟盘扫描用testnet行情”的口径错位。

@@ -294,7 +294,8 @@ class Handler(BaseHTTPRequestHandler):
             report["report_path"] = str(path)
             self._json(report)
         except Exception as exc:
-            self._json({"error": str(exc)}, 500)
+            message = str(exc)
+            self._json({"error": message[:1000]}, 500)
 
 
 def one(query: dict[str, list[str]], key: str, default: str) -> str:
