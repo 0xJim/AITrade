@@ -1,0 +1,94 @@
+{
+  "name": "v11j-G60B-universal",
+  "version": "0.3",
+  "market": {
+    "symbol_limit": 30,
+    "min_quote_volume": 50000000,
+    "exclude_symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "USDCUSDT",
+      "FDUSDUSDT",
+      "BTCDOMUSDT",
+      "BTCSTUSDT",
+      "ZECUSDT",
+      "DUSDT",
+      "NILUSDT",
+      "SOLUSDT",
+      "DOGEUSDT",
+      "CLUSDT",
+      "KSMUSDT",
+      "HYPEUSDT",
+      "TAOUSDT",
+      "PUMPUSDT",
+      "BZUSDT",
+      "FILUSDT",
+      "WLFIUSDT",
+      "ONDOUSDT",
+      "ENAUSDT",
+      "ADAUSDT",
+      "LDOUSDT",
+      "SKYAIUSDT",
+      "SNDKUSDT",
+      "SUIUSDT",
+      "TONUSDT",
+      "VVVUSDT",
+      "XRPUSDT"
+    ]
+  },
+  "risk": {
+    "initial_balance": 1000,
+    "leverage": 3,
+    "position_pct": 10,
+    "max_positions": 3,
+    "cooldown_hours": 4,
+    "grace_period_hours": 4,
+    "max_hold_hours": 72,
+    "max_loss_per_trade": 60,
+    "max_sl_pct": 0.07,
+    "short_score_reduce_threshold": 5,
+    "short_score_reduce_mult": 0.5,
+    "low_score_boost_threshold": 4,
+    "low_score_boost_mult": 1.3,
+    "consecutive_loss_threshold": 2,
+    "consecutive_loss_mult": 0.5
+  },
+  "technical": {
+    "ema_fast": 9,
+    "ema_slow": 21,
+    "ema_band": 0.001,
+    "rsi_period": 14,
+    "atr_period": 14
+  },
+  "signals": {
+    "extreme_funding_enabled": true,
+    "pump_reversal_enabled": true,
+    "extreme_neg_funding": -0.08,
+    "extreme_pos_funding": 0.10,
+    "pump_short_change_pct": 40,
+    "pump_short_pullback_pct": 6,
+    "crash_long_change_pct": 25,
+    "crash_long_bounce_pct": 4,
+    "min_score": 4,
+    "atr_sl_multiplier": 1.5,
+    "min_sl_pct": 0.025,
+    "max_sl_pct": 0.07,
+    "max_atr_pct": 0.045,
+    "rr": 2.0
+  },
+  "profile_controls": {
+    "v8_signal_quality_min": 85,
+    "mtf_agree_min": 4
+  },
+  "evidence": {
+    "source": "data/final_true_one_year_backtests/final_true_one_year_all_strategies.json",
+    "window": "2025-05-14T10:00:00+08:00/2026-05-14T10:00:00+08:00",
+    "optimized_g60_b": {
+      "pnl_1000u": 601.27,
+      "roi_pct": 60.1,
+      "max_drawdown_pct": 3.31,
+      "profit_factor": 1.72,
+      "roi_dd_ratio": 18.17
+    }
+  }
+}
