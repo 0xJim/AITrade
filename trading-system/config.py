@@ -116,6 +116,18 @@ CLOSED_15M_ANOMALY_VOLUME_RATIO_MIN = float(get_config("CLOSED_15M_ANOMALY_VOLUM
 CLOSED_15M_ANOMALY_BODY_RATIO_MIN = float(get_config("CLOSED_15M_ANOMALY_BODY_RATIO_MIN", "0.55"))
 CLOSED_15M_ANOMALY_CLOSE_POSITION_MIN = float(get_config("CLOSED_15M_ANOMALY_CLOSE_POSITION_MIN", "0.65"))
 
+# === Spike-v13-P4 15m 异动模块 ===
+# 独立进攻模块，默认只做模拟盘/扫描；实际资金分配见 docs/1000u-g60b-spike-v13-plan.md。
+SPIKE_LONG_ONLY = get_config("SPIKE_LONG_ONLY", "true").lower() == "true"
+SPIKE_REQUIRE_EMA_UP = get_config("SPIKE_REQUIRE_EMA_UP", "true").lower() == "true"
+SPIKE_THRESHOLD = float(get_config("SPIKE_THRESHOLD", "0.01"))
+SPIKE_MIN_ATR = float(get_config("SPIKE_MIN_ATR", "0.005"))
+SPIKE_MIN_RSI = float(get_config("SPIKE_MIN_RSI", "50"))
+SPIKE_POSITION_PCT = float(get_config("SPIKE_POSITION_PCT", "0.04"))
+SPIKE_ALLOCATED_BALANCE = float(get_config("SPIKE_ALLOCATED_BALANCE", "300"))
+SPIKE_MAX_OPEN_POSITIONS = int(get_config("SPIKE_MAX_OPEN_POSITIONS", "3"))
+SPIKE_MAX_HOLD_HOURS = float(get_config("SPIKE_MAX_HOLD_HOURS", "8"))
+
 # === OI/费率阈值 ===
 EXTREME_NEG_FUNDING = -0.08
 EXTREME_POS_FUNDING = 0.10
