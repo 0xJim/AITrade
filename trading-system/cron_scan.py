@@ -13,12 +13,16 @@ import os
 import time
 from collections import defaultdict
 
-sys.path.insert(0, '/home/ubuntu/.hermes/trading')
+# 兼容外部hermes路径
+hermes_trading_path = os.environ.get("HERMES_TRADING_PATH")
+if hermes_trading_path:
+    sys.path.insert(0, hermes_trading_path)
 
 from datetime import datetime, timezone, timedelta
 TZ_UTC8 = timezone(timedelta(hours=8))
 
 from config import *
+from config import STRATEGY_PROFILE, STRATEGY_PROFILES, ENABLE_LIVE_TRADING, LIVE_CONFIRM
 from binance_api import (
     get_qualified_symbols, get_funding_rates, get_funding_history,
     get_klines, get_price, get_btc_trend, get_fear_greed,
@@ -35,13 +39,29 @@ from binance_api import (
     open_long,
     open_short,
     close_position,
+    place_stop_loss_order,
+    cancel_all_orders,
 )
 from notifier import format_open_message, format_close_message, format_review_message
-from intel_flow import intel_macro_score, intel_smart_money_confirm, intel_quick_macro
+
+# intel_flow 可选导入（仓库可能不存在）
+try:
+    from intel_flow import intel_macro_score, intel_smart_money_confirm, intel_quick_macro
+except ImportError:
+    def intel_macro_score():
+        return 0
+
+    def intel_smart_money_confirm(cand=None):
+        return 0
+
+    def intel_quick_macro():
+        return {}
+
 from review_db import sync_trade, add_tag, add_note, get_stats, get_recent_trades
 
 TRADES_FILE = DATA_DIR / "trades.json"
 STATE_FILE = DATA_DIR / "scanner_state.json"
+SCAN_DECISIONS_FILE = DATA_DIR / "scan_decisions.jsonl"
 
 
 # === v4: 动态黑名单 ===
@@ -58,10 +78,18 @@ def update_dynamic_blacklist(data):
     
     now = datetime.now(TZ_UTC8)
     cutoff = now - timedelta(days=BLACKLIST_LOOKBACK_DAYS)
-    cutoff_str = cutoff.strftime("%Y-%m-%dT%H:%M:%S")
-    
-    recent = [t for t in data["trades"] 
-              if t["status"] == "closed" and t.get("exit_time","").startswith(cutoff_str[:10])]
+    recent = []
+    for t in data["trades"]:
+        if t.get("status") != "closed" or not t.get("exit_time"):
+            continue
+        try:
+            exit_dt = datetime.fromisoformat(t["exit_time"])
+            if exit_dt.tzinfo is None:
+                exit_dt = exit_dt.replace(tzinfo=TZ_UTC8)
+            if exit_dt >= cutoff:
+                recent.append(t)
+        except Exception:
+            continue
     
     by_sym = defaultdict(lambda: {"n": 0, "wins": 0, "pnl": 0})
     for t in recent:
@@ -102,10 +130,14 @@ def load_blacklist():
     """加载当前黑名单 = 静态黑名单 + 动态黑名单"""
     combined = set()
     try:
-        from config import STATIC_BLACKLIST
-        combined.update(STATIC_BLACKLIST)
+        from config import ACTIVE_STATIC_BLACKLIST
+        combined.update(ACTIVE_STATIC_BLACKLIST)
     except ImportError:
-        pass
+        try:
+            from config import STATIC_BLACKLIST
+            combined.update(STATIC_BLACKLIST)
+        except ImportError:
+            pass
     try:
         from config import BLACKLIST_FILE
         if BLACKLIST_FILE.exists():
@@ -145,6 +177,33 @@ def log(msg: str):
     ts = datetime.now(TZ_UTC8).strftime("%m-%d %H:%M:%S")
     line = f"[{ts}] {msg}"
     print(line, file=sys.stderr)
+
+
+def log_scan_decision(decision: dict):
+    """
+    记录扫描决策到 scan_decisions.jsonl
+    decision 格式:
+    {
+        "timestamp": str,
+        "symbol": str,
+        "direction": str,
+        "status": "accepted" | "rejected",
+        "reason": str,  # 拒绝原因或接受原因
+        "v8_score": float,
+        "signal_quality": float,
+        "rsi": float,
+        "atr_pct": float,
+        "sl_pct": float,
+        "position_usd": float,  # 仅 accepted
+        "entry_price": float,   # 仅 accepted
+    }
+    """
+    try:
+        decision["timestamp"] = now_str()
+        with open(SCAN_DECISIONS_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(decision, ensure_ascii=False) + "\n")
+    except Exception as e:
+        log(f"写入scan_decisions失败: {e}")
 
 def notify(msg: str):
     """有交易动作时发通知（开仓/平仓/复盘）"""
@@ -208,6 +267,7 @@ def execute_open(symbol: str, direction: str, usd_amount: float, leverage: int) 
             result["success"] = True
             result["order"] = order
             result["quantity"] = quantity
+            result["price_precision"] = prec.get("price_precision", 6)
             result["fill_price"] = float(order.get("avgPrice", 0)) or float(order.get("price", 0)) or price
             log(f"下单成功: orderId={order.get('orderId')} status={order.get('status')} fill={result['fill_price']}")
         else:
@@ -238,6 +298,10 @@ def execute_close(symbol: str, direction: str, quantity: float) -> dict:
             result["order"] = order
             result["fill_price"] = float(order.get("avgPrice", 0)) or float(order.get("price", 0)) or 0
             log(f"平仓成功: orderId={order.get('orderId')} fill={result['fill_price']}")
+            if order.get("status") == "FILLED":
+                cancel_result = cancel_all_orders(symbol)
+                if isinstance(cancel_result, dict) and "error" in cancel_result:
+                    log(f"取消遗留止损单失败: {cancel_result}")
         else:
             result["error"] = f"未知平仓结果: {order}"
             log(f"未知平仓结果: {order}")
@@ -255,13 +319,14 @@ def execute_close(symbol: str, direction: str, quantity: float) -> dict:
 
 def quick_scan(open_symbols, cooldowns):
     """
-    快速扫描: 筛选极端费率/暴涨暴跌候选
+    快速扫描: 优先用15m已收线异动生成候选，再补充极端费率/暴涨暴跌候选。
     v5: 阈值收紧，只保留高质量信号
     """
     tickers = get_qualified_symbols()
     funding = get_funding_rates()
     now = datetime.now(TZ_UTC8)
     candidates = []
+    checked_15m = 0
     
     for t in tickers:
         sym = t["symbol"]
@@ -281,6 +346,37 @@ def quick_scan(open_symbols, cooldowns):
         chg = float(t.get("priceChangePercent", 0))
         price = float(t.get("lastPrice", 0))
         vol = float(t.get("quoteVolume", 0))
+
+        if CLOSED_15M_ANOMALY_ENABLED and checked_15m < CLOSED_15M_ANOMALY_MAX_CHECK:
+            checked_15m += 1
+            try:
+                klines_15m = get_klines(sym, "15m", 3)
+                # Binance 最近一根通常仍在形成，固定取倒数第二根作为已收线 K 线。
+                if klines_15m and len(klines_15m) >= 2:
+                    closed = klines_15m[-2]
+                    open_15m = float(closed[1])
+                    close_15m = float(closed[4])
+                    if open_15m > 0:
+                        move_pct = (close_15m - open_15m) / open_15m * 100
+                        if abs(move_pct) >= CLOSED_15M_ANOMALY_THRESHOLD_PCT:
+                            direction = "long" if move_pct > 0 else "short"
+                            strength = "A" if abs(move_pct) >= CLOSED_15M_ANOMALY_STRONG_PCT else "B"
+                            candidates.append({
+                                "symbol": sym,
+                                "type": "closed_15m_spike",
+                                "direction": direction,
+                                "strength": strength,
+                                "price": close_15m,
+                                "fr": fr,
+                                "change": move_pct,
+                                "change_24h": chg,
+                                "vol": vol,
+                                "kline_close_time": int(closed[6]) if len(closed) > 6 else None,
+                                "reason": f"15m收线异动{move_pct:+.2f}%",
+                            })
+                            continue
+            except Exception:
+                pass
         
         if fr < EXTREME_NEG_FUNDING:
             # v5: 负费率做多需要BTC不暴跌 + RSI超卖确认
@@ -468,8 +564,8 @@ def v8_calc_weights(cand: dict, tech: dict, btc_trend: dict) -> tuple:
     # 成交量确认
     if vol > 200_000_000: pv_score += 1
     elif vol < 50_000_000: pv_score -= 1
-    # ATR适中加分
-    if 0.5 < atr_pct < 5: pv_score += 1
+    # ATR适中加分 (小数形式: 0.005 = 0.5%, 0.05 = 5%)
+    if 0.005 < atr_pct < 0.05: pv_score += 1
     # 映射到±25
     scores["pv"] = max(-25, min(25, int(pv_score * 5)))
     details.append(f"量价:{scores['pv']:+d}")
@@ -573,8 +669,8 @@ def v8_signal_quality(cand: dict, tech: dict) -> float:
     if vol > 200_000_000: pv += 10
     elif vol > 100_000_000: pv += 5
     elif vol < 50_000_000: pv -= 5
-    # ATR适中加分
-    if 0.5 < atr_pct < 5: pv += 5
+    # ATR适中加分 (小数形式: 0.005 = 0.5%, 0.05 = 5%)
+    if 0.005 < atr_pct < 0.05: pv += 5
     pv = max(0, min(40, pv))
     
     # 2. 形态识别 (30分) — v8完整形态识别
@@ -667,9 +763,10 @@ def deep_check(cand):
     
     # === 1. 费率历史验证 ===
     fr_hist = get_funding_history(sym, 8)
-    if not fr_hist:
+    funding_required = cand["type"] in ("extreme_neg_funding", "extreme_pos_funding")
+    if funding_required and not fr_hist:
         return None
-    avg = sum(fr_hist) / len(fr_hist)
+    avg = sum(fr_hist) / len(fr_hist) if fr_hist else cand.get("fr", 0)
     
     if cand["type"] == "extreme_neg_funding":
         neg = sum(1 for r in fr_hist if r < -0.03)
@@ -699,6 +796,23 @@ def deep_check(cand):
         if pb < 5: return None  # v3: 恢复回落阈值 8→5（与signals.py统一）
         cand["reason"] = f"24h暴涨{cand['change']:+.1f}% 后回落{pb:.0f}%"
         cand["strength"] = "A" if pb > 10 else "B"  # v3: 与signals.py统一
+    elif cand["type"] == "closed_15m_spike":
+        klines_15m = get_klines(sym, "15m", 3)
+        if not klines_15m or len(klines_15m) < 2:
+            return None
+        closed = klines_15m[-2]
+        open_15m = float(closed[1])
+        close_15m = float(closed[4])
+        if open_15m <= 0:
+            return None
+        move_pct = (close_15m - open_15m) / open_15m * 100
+        expected_direction = "long" if move_pct > 0 else "short"
+        if abs(move_pct) < CLOSED_15M_ANOMALY_THRESHOLD_PCT or expected_direction != cand["direction"]:
+            return None
+        cand["price"] = close_15m
+        cand["change"] = move_pct
+        cand["strength"] = "A" if abs(move_pct) >= CLOSED_15M_ANOMALY_STRONG_PCT else "B"
+        cand["reason"] = f"15m收线异动{move_pct:+.2f}%"
     elif cand["type"] in ("oi_surge", "funding_flip_neg", "funding_flip_pos"):
         # OI异动和费率翻转: 不需要费率历史验证(quick_scan已确认)
         # 但在deep_check中校验OI是否仍然有效(对于oi_surge)
@@ -1157,13 +1271,25 @@ def main():
     else:
         log(f"币安余额: 可用${avail_bal:.2f} 总${total_bal:.2f}")
         api_ok = True
+
+    # ═══ 实盘硬锁 ═══
+    # 非testnet环境必须同时满足两个条件才能真实下单:
+    # 1. ENABLE_LIVE_TRADING=true
+    # 2. LIVE_CONFIRM=I_UNDERSTAND_MAINNET_RISK
+    if api_ok and not BINANCE_TESTNET:
+        if not ENABLE_LIVE_TRADING or LIVE_CONFIRM != "I_UNDERSTAND_MAINNET_RISK":
+            log("BLOCKED_LIVE_FORBIDDEN: 实盘交易被禁用")
+            log("  如需启用实盘，必须设置:")
+            log("  1. ENABLE_LIVE_TRADING=true")
+            log("  2. LIVE_CONFIRM=I_UNDERSTAND_MAINNET_RISK")
+            api_ok = False
     
     # === P0-1: 持仓同步 ===
     # 如果API连通，用交易所实际持仓校准trades.json
     # 如果某笔trade标记为open但交易所无对应持仓，标记为orphan并自动平仓
     if api_ok:
         try:
-            real_positions = get_positions()
+            real_positions = api_get_positions()
             real_symbols = set()
             for p in real_positions:
                 amt = float(p.get('positionAmt', 0))
@@ -1208,14 +1334,20 @@ def main():
         tp = trade["take_profit"]
         triggered = None
         sl_adjusted = None
-        
+
         # v4: 入场宽限期 — 入场后GRACE_PERIOD_HOURS内不扫止损
+        # 但如果已挂交易所止损单，优先安全不使用宽限期
         try:
-            from config import GRACE_PERIOD_HOURS
+            from config import GRACE_PERIOD_HOURS, EXCHANGE_STOP_IMMEDIATE
             entry_dt = datetime.fromisoformat(trade["entry_time"])
             if entry_dt.tzinfo is None:
                 entry_dt = entry_dt.replace(tzinfo=TZ_UTC8)
-            in_grace = (now - entry_dt).total_seconds() < GRACE_PERIOD_HOURS * 3600
+            has_exchange_stop = bool(trade.get("stop_order_id"))
+            # 如果有交易所止损单且EXCHANGE_STOP_IMMEDIATE=True，不使用宽限期
+            if has_exchange_stop and EXCHANGE_STOP_IMMEDIATE:
+                in_grace = False
+            else:
+                in_grace = (now - entry_dt).total_seconds() < GRACE_PERIOD_HOURS * 3600
         except Exception:
             in_grace = False
         
@@ -1243,46 +1375,59 @@ def main():
             trail_result = check_trailing_stop(trade, price)
             if trail_result:
                 triggered = trail_result
-        
+
         # v3: 移除时间止损(MAX_HOLD/TIME_DECAY) — 无回测支撑，强制平仓反而干扰
-        
+
         if triggered:
             entry = trade["entry_price"]
             lev = trade.get("leverage", LEVERAGE)
             pos_usd = trade.get("position_usd", 0)
-            
+
             if trade["direction"] == "long":
                 pnl_pct = (price - entry) / entry * 100 * lev
             else:
                 pnl_pct = (entry - price) / entry * 100 * lev
-            
-            trade["exit_price"] = price
-            trade["exit_time"] = now_str()
-            trade["exit_reason"] = triggered
-            trade["pnl_pct"] = round(pnl_pct, 2)
-            trade["pnl_usd"] = round(pnl_pct / 100 * pos_usd, 4)
-            trade["status"] = "closed"
-            
-            # 真实平仓
+
+            # 先尝试真实平仓（如果有quantity）
+            exit_price = price
+            close_success = False
+
             if api_ok and trade.get("quantity"):
                 close_result = execute_close(trade["symbol"], trade["direction"], trade["quantity"])
                 if close_result["success"]:
-                    trade["exit_price"] = close_result.get("fill_price", price)
-                    log(f"真实平仓成功 @{trade['exit_price']}")
+                    exit_price = close_result.get("fill_price", price)
+                    close_success = True
+                    log(f"真实平仓成功 @{exit_price}")
                 else:
+                    # 真实平仓失败，保留open状态，记录错误
+                    trade["close_error"] = close_result["error"]
+                    trade["close_error_time"] = now_str()
                     notify(f"⚠️ 真实平仓失败 #{trade['id']} {trade['symbol']}: {close_result['error']}")
                     log(f"真实平仓失败: {close_result['error']}")
-            
-            notify(format_close_message(trade))
-            notify(format_review_message(trade))
-            # v8: 同步到复盘数据库
-            try:
-                sync_trade(trade)
-            except Exception:
-                pass
-            
-            d_cn = "多" if trade["direction"] == "long" else "空"
-            log(f"平仓 #{trade['id']} {trade['symbol']} {d_cn} {triggered} {trade['pnl_usd']:+.2f}U")
+                    continue  # 跳过后续处理，保持open状态
+            elif trade.get("_simulated"):
+                # 模拟仓位直接关闭
+                close_success = True
+
+            # 只有平仓成功才标记为closed
+            if close_success:
+                trade["exit_price"] = exit_price
+                trade["exit_time"] = now_str()
+                trade["exit_reason"] = triggered
+                trade["pnl_pct"] = round(pnl_pct, 2)
+                trade["pnl_usd"] = round(pnl_pct / 100 * pos_usd, 4)
+                trade["status"] = "closed"
+
+                notify(format_close_message(trade))
+                notify(format_review_message(trade))
+                # v8: 同步到复盘数据库
+                try:
+                    sync_trade(trade)
+                except Exception:
+                    pass
+
+                d_cn = "多" if trade["direction"] == "long" else "空"
+                log(f"平仓 #{trade['id']} {trade['symbol']} {d_cn} {triggered} {trade['pnl_usd']:+.2f}U")
     
     save_json(TRADES_FILE, data)
     
@@ -1335,7 +1480,24 @@ def main():
     # v4: 过滤黑名单币种
     if blacklist:
         before_count = len(candidates)
-        candidates = [c for c in candidates if c["symbol"] not in blacklist]
+        rejected = []
+        kept = []
+        for c in candidates:
+            if c["symbol"] in blacklist:
+                rejected.append(c)
+            else:
+                kept.append(c)
+        candidates = kept
+        # 记录黑名单拒绝
+        for c in rejected:
+            log_scan_decision({
+                "symbol": c["symbol"],
+                "direction": c.get("direction", "unknown"),
+                "status": "rejected",
+                "reason": f"黑名单",
+                "signal_type": c.get("type", ""),
+                "strength": c.get("strength", ""),
+            })
         if before_count != len(candidates):
             log(f"  黑名单过滤: {before_count}→{len(candidates)}")
     
@@ -1351,9 +1513,25 @@ def main():
         # P0-2: 跳过近24h亏损币种
         if cand["symbol"] in loss_symbols_24h:
             log(f"  {cand['symbol']} 近24h亏损，跳过")
+            log_scan_decision({
+                "symbol": cand["symbol"],
+                "direction": cand.get("direction", "unknown"),
+                "status": "rejected",
+                "reason": "近24h亏损冷却",
+                "signal_type": cand.get("type", ""),
+                "strength": cand.get("strength", ""),
+            })
             continue
         verified = deep_check(cand)
         if not verified:
+            log_scan_decision({
+                "symbol": cand["symbol"],
+                "direction": cand.get("direction", "unknown"),
+                "status": "rejected",
+                "reason": "deep_check验证失败",
+                "signal_type": cand.get("type", ""),
+                "strength": cand.get("strength", ""),
+            })
             continue
         # v3: 移除B级信号封杀 — 交给信号质量评分系统自然过滤
         
@@ -1370,14 +1548,35 @@ def main():
                 signal_quality -= 10  # RSI极端扣10分
             if signal_quality < V8_SIGNAL_QUALITY_MIN:
                 log(f"  v8信号质量{signal_quality:.0f}<{V8_SIGNAL_QUALITY_MIN}，跳过")
+                log_scan_decision({
+                    "symbol": verified["symbol"],
+                    "direction": verified.get("direction", "unknown"),
+                    "status": "rejected",
+                    "reason": f"v8信号质量{signal_quality:.0f}<{V8_SIGNAL_QUALITY_MIN}",
+                    "signal_quality": signal_quality,
+                    "signal_type": verified.get("type", ""),
+                    "strength": verified.get("strength", ""),
+                    "rsi": verified.get("rsi", 50),
+                    "atr_pct": verified.get("atr_pct", 0),
+                })
                 continue
-            
+
             # 条件2: RR比 ≥ V8_RR_MIN (v3: 默认1.3)
             sl_pct = verified.get("sl_pct", DEFAULT_SL_PCT)
             tp_pct = verified.get("tp_pct", DEFAULT_TP_PCT)
             rr = tp_pct / sl_pct if sl_pct > 0 else 0
             if rr < V8_RR_MIN:
                 log(f"  v8 RR比{rr:.1f}<{V8_RR_MIN}，跳过")
+                log_scan_decision({
+                    "symbol": verified["symbol"],
+                    "direction": verified.get("direction", "unknown"),
+                    "status": "rejected",
+                    "reason": f"RR比{rr:.1f}<{V8_RR_MIN}",
+                    "signal_quality": signal_quality,
+                    "rr": rr,
+                    "sl_pct": sl_pct * 100,
+                    "signal_type": verified.get("type", ""),
+                })
                 continue
             
             # v3: 移除宏观评分30-70区间门槛
@@ -1430,14 +1629,31 @@ def main():
                 from config import MTF_AGREE_MIN
                 if mtf_agree < MTF_AGREE_MIN:
                     log(f"  v8 MTF一致性{mtf_agree}<{MTF_AGREE_MIN}，跳过")
+                    log_scan_decision({
+                        "symbol": verified["symbol"],
+                        "direction": verified.get("direction", "unknown"),
+                        "status": "rejected",
+                        "reason": f"MTF一致性{mtf_agree}<{MTF_AGREE_MIN}",
+                        "signal_quality": signal_quality,
+                        "mtf_agree": mtf_agree,
+                        "signal_type": verified.get("type", ""),
+                    })
                     continue
             except ImportError:
                 pass
-            
+
             trend_ok = (direction == "long" and trend_1h != "down" and trend_4h != "down") or \
                        (direction == "short" and trend_1h != "up" and trend_4h != "up")
             if not trend_ok:
                 log(f"  v8 EMA趋势不符(1h={trend_1h},4h={trend_4h})，跳过")
+                log_scan_decision({
+                    "symbol": verified["symbol"],
+                    "direction": verified.get("direction", "unknown"),
+                    "status": "rejected",
+                    "reason": f"EMA趋势不符(1h={trend_1h},4h={trend_4h})",
+                    "signal_quality": signal_quality,
+                    "signal_type": verified.get("type", ""),
+                })
                 continue
             
             log(f"  ✅ v8通过: 信号={signal_quality:.0f}/100 RR={rr:.1f} 宏观={macro_normalized:.0f} MTF={mtf_agree} 趋势=✓")
@@ -1496,17 +1712,44 @@ def main():
                 # SL>10%跳过
                 if sl_pct_val > V11I_MAX_SL_PCT:
                     log(f"  v11i SL={sl_pct_val:.1f}%>{V11I_MAX_SL_PCT}%，跳过")
+                    log_scan_decision({
+                        "symbol": verified["symbol"],
+                        "direction": verified.get("direction", "unknown"),
+                        "status": "rejected",
+                        "reason": f"v11i SL={sl_pct_val:.1f}%>{V11I_MAX_SL_PCT}%",
+                        "v8_score": v8_score_int,
+                        "sl_pct": sl_pct_val,
+                        "signal_type": verified.get("type", ""),
+                    })
                     continue
-                
+
                 # ATR>5%跳过
                 if atr_pct_val is not None and atr_pct_val * 100 > V11I_MAX_ATR_PCT:
                     log(f"  v11i ATR={atr_pct_val*100:.1f}%>{V11I_MAX_ATR_PCT}%，跳过")
+                    log_scan_decision({
+                        "symbol": verified["symbol"],
+                        "direction": verified.get("direction", "unknown"),
+                        "status": "rejected",
+                        "reason": f"v11i ATR={atr_pct_val*100:.1f}%>{V11I_MAX_ATR_PCT}%",
+                        "v8_score": v8_score_int,
+                        "atr_pct": atr_pct_val * 100,
+                        "signal_type": verified.get("type", ""),
+                    })
                     continue
-                
+
                 # V8≥6.5 + RSI<55 做多跳过
                 if V11I_FILTER_V8_RSI and direction == "long":
                     if v8_score_int >= V11I_V8_HIGH_THRESHOLD and rsi_val is not None and rsi_val < 55:
                         log(f"  v11i V8={v8_score_int}≥{V11I_V8_HIGH_THRESHOLD}+RSI={rsi_val:.0f}<55做多跳过")
+                        log_scan_decision({
+                            "symbol": verified["symbol"],
+                            "direction": verified.get("direction", "unknown"),
+                            "status": "rejected",
+                            "reason": f"v11i V8={v8_score_int}+RSI={rsi_val:.0f}<55做多",
+                            "v8_score": v8_score_int,
+                            "rsi": rsi_val,
+                            "signal_type": verified.get("type", ""),
+                        })
                         continue
                 
                 # ── V11I仓位调整 ──
@@ -1564,8 +1807,8 @@ def main():
             except Exception as e:
                 log(f"  v11i 异常: {e}")
             
-            # ═══ v11j新增: 单笔亏损上限 (方案M — 15方案回测碾压最优) ═══
-            # 回测: 1000U/1年，仅加此一项 → PnL +64%/DD -75%/月胜97.1%
+            # ═══ v11j新增: 单笔风险上限 (方案M — 保守风控挡位) ═══
+            # 修正后1000天: PnL +$4011/DD16.5%/ROI-DD24.4
             # 逻辑: max_loss = pos_usd × sl_pct × leverage
             #        若 max_loss > $40，缩小 pos_usd 使 max_loss = $40
             try:
@@ -1626,8 +1869,12 @@ def main():
             "signal_type": verified["type"],
             "signal_strength": verified["strength"],
             "signal_reason": f"[{verified['strength']}] {verified.get('reason', '')}",
-            "signal_sl_pct": round(sl_pct * 100, 2),
-            "signal_tp_pct": round(tp_pct * 100, 2),
+            "signal_sl_pct": round(sl_pct * 100, 2),  # legacy percent field
+            "signal_tp_pct": round(tp_pct * 100, 2),  # legacy percent field
+            "signal_sl_pct_raw": round(sl_pct, 6),
+            "signal_sl_pct_percent": round(sl_pct * 100, 2),
+            "signal_tp_pct_raw": round(tp_pct, 6),
+            "signal_tp_pct_percent": round(tp_pct * 100, 2),
             "signal_rr": round(rr, 2),
             # v5新增: 技术指标快照
             "tech_snapshot": {
@@ -1641,6 +1888,8 @@ def main():
             # 移动止盈跟踪
             "trail_high": None,
             "trail_low": None,
+            # v11j: 策略 Profile
+            "strategy_profile": STRATEGY_PROFILE,
         }
         
         # 真实下单
@@ -1650,13 +1899,27 @@ def main():
                 trade["quantity"] = open_result["quantity"]
                 trade["binance_order_id"] = open_result["order"].get("orderId")
                 trade["entry_price"] = open_result.get("fill_price", price)
+                price_precision = open_result.get("price_precision", 6)
                 # 用实际成交价重算SL/TP
                 if verified["direction"] == "long":
-                    trade["stop_loss"] = round(trade["entry_price"] * (1 - sl_pct), 6)
-                    trade["take_profit"] = round(trade["entry_price"] * (1 + tp_pct), 6)
+                    trade["stop_loss"] = round(trade["entry_price"] * (1 - sl_pct), price_precision)
+                    trade["take_profit"] = round(trade["entry_price"] * (1 + tp_pct), price_precision)
                 else:
-                    trade["stop_loss"] = round(trade["entry_price"] * (1 + sl_pct), 6)
-                    trade["take_profit"] = round(trade["entry_price"] * (1 - tp_pct), 6)
+                    trade["stop_loss"] = round(trade["entry_price"] * (1 + sl_pct), price_precision)
+                    trade["take_profit"] = round(trade["entry_price"] * (1 - tp_pct), price_precision)
+                stop_result = place_stop_loss_order(
+                    verified["symbol"],
+                    trade["quantity"],
+                    verified["direction"],
+                    trade["stop_loss"],
+                )
+                if isinstance(stop_result, dict) and "error" in stop_result:
+                    trade["stop_order_error"] = stop_result
+                    notify(f"⚠️ 止损单挂单失败 {verified['symbol']}: {stop_result}")
+                    log(f"⚠️ STOP_MARKET止损单失败: {stop_result}")
+                else:
+                    trade["stop_order_id"] = stop_result.get("orderId") if isinstance(stop_result, dict) else None
+                    log(f"✅ STOP_MARKET止损单已挂 orderId={trade.get('stop_order_id')}")
                 log(f"✅ 真实下单成功 orderId={trade['binance_order_id']}")
             else:
                 notify(f"⚠️ 真实下单失败 {verified['symbol']}: {open_result['error']}")
@@ -1666,7 +1929,29 @@ def main():
         else:
             trade["_simulated"] = True
             log(f"API未连通，仅模拟开仓")
-        
+
+        # 记录接受的决策
+        log_scan_decision({
+            "symbol": verified["symbol"],
+            "direction": verified["direction"],
+            "status": "accepted",
+            "reason": verified.get("reason", ""),
+            "v8_score": int(weighted_score) if V8_ENABLED else 0,
+            "signal_quality": signal_quality if V8_ENABLED else 0,
+            "rsi": verified.get("rsi", 50),
+            "atr_pct": verified.get("atr_pct", 0),
+            "sl_pct": sl_pct * 100,
+            "sl_pct_raw": sl_pct,
+            "sl_pct_percent": sl_pct * 100,
+            "position_usd": pos_usd,
+            "entry_price": trade["entry_price"],
+            "leverage": LEVERAGE,
+            "signal_type": verified.get("type", ""),
+            "strength": verified.get("strength", ""),
+            "mtf_agree": verified.get("mtf_agree"),
+            "strategy_profile": STRATEGY_PROFILE,
+        })
+
         data["trades"].append(trade)
         # v8: 同步到复盘数据库
         try:
@@ -1685,9 +1970,10 @@ def main():
         macro_snapshot = intel_quick_macro()
         notify_detail = env_detail if not V8_ENABLED else score_detail
         notify(format_open_message(trade, notify_detail + f"\n📡 {macro_snapshot}"))
-        
+
         d_cn = "多" if verified["direction"] == "long" else "空"
-        log(f"开仓 #{trade['id']} {verified['symbol']} {d_cn} @ {trade['entry_price']} RR={rr:.1f}")
+        profile_desc = STRATEGY_PROFILES.get(STRATEGY_PROFILE, {}).get("desc", STRATEGY_PROFILE)
+        log(f"开仓 #{trade['id']} {verified['symbol']} {d_cn} @ {trade['entry_price']} RR={rr:.1f} Profile={STRATEGY_PROFILE}({profile_desc})")
         break
     
     # 输出状态摘要

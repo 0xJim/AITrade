@@ -9,7 +9,7 @@ import requests
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
-from config import FAPI, MIN_VOLUME_M, BINANCE_API_KEY, BINANCE_API_SECRET
+from config import DATA_FAPI, TRADE_FAPI, MIN_VOLUME_M, BINANCE_API_KEY, BINANCE_API_SECRET
 
 TZ_UTC8 = timezone(timedelta(hours=8))
 
@@ -32,7 +32,7 @@ def _headers() -> dict:
 
 def api_get(endpoint: str, params: dict = None, retries: int = 3) -> dict | list | None:
     """币安合约API GET请求（公开，无需签名）"""
-    url = f"{FAPI}{endpoint}"
+    url = f"{DATA_FAPI}{endpoint}"
     for attempt in range(retries):
         try:
             resp = requests.get(url, params=params, timeout=10)
@@ -51,7 +51,7 @@ def signed_get(endpoint: str, params: dict = None, retries: int = 3) -> dict | l
     """币安合约API 签名GET请求"""
     if params is None:
         params = {}
-    url = f"{FAPI}{endpoint}"
+    url = f"{TRADE_FAPI}{endpoint}"
     for attempt in range(retries):
         try:
             signed_params = _sign(dict(params))
@@ -71,7 +71,7 @@ def signed_post(endpoint: str, params: dict = None, retries: int = 3) -> dict | 
     """币安合约API 签名POST请求"""
     if params is None:
         params = {}
-    url = f"{FAPI}{endpoint}"
+    url = f"{TRADE_FAPI}{endpoint}"
     for attempt in range(retries):
         try:
             signed_params = _sign(dict(params))
@@ -91,7 +91,7 @@ def signed_delete(endpoint: str, params: dict = None, retries: int = 3) -> dict 
     """币安合约API 签名DELETE请求"""
     if params is None:
         params = {}
-    url = f"{FAPI}{endpoint}"
+    url = f"{TRADE_FAPI}{endpoint}"
     for attempt in range(retries):
         try:
             signed_params = _sign(dict(params))
@@ -181,6 +181,19 @@ def close_position(symbol: str, quantity: float, direction: str) -> dict:
     """平仓 direction: 'long' / 'short'"""
     side = "SELL" if direction == "long" else "BUY"
     return place_order(symbol, side, quantity, reduce_only=True)
+
+
+def place_stop_loss_order(symbol: str, quantity: float, direction: str, stop_price: float) -> dict:
+    """挂交易所级 reduceOnly STOP_MARKET 止损单。"""
+    side = "SELL" if direction == "long" else "BUY"
+    return place_order(
+        symbol,
+        side,
+        quantity,
+        order_type="STOP_MARKET",
+        stop_price=stop_price,
+        reduce_only=True,
+    )
 
 
 def cancel_all_orders(symbol: str) -> dict:
@@ -424,8 +437,11 @@ def get_technical_indicators(symbol: str) -> dict:
     if klines_1h and len(klines_1h) >= 15:
         result["atr"] = calc_atr(klines_1h, 14)
         if result["price"] > 0:
-            result["atr_pct"] = result["atr"] / result["price"] * 100
-    
+            # atr_pct: 小数形式 (0.023 = 2.3%)
+            # atr_pct_percent: 百分比形式 (2.3)
+            result["atr_pct"] = result["atr"] / result["price"]
+            result["atr_pct_percent"] = result["atr_pct"] * 100
+
     return result
 
 
@@ -479,5 +495,9 @@ def get_technical_indicators_v8(symbol: str) -> dict:
         if result["1h"]["trend"] == result["4h"]["trend"]:
             result["tf_aligned"] = True
             result["tf_bias"] = result["1h"]["trend"]
-    
+
+    # 兼容字段：同时支持 "1h"/"4h" 和 "tf_1h"/"tf_4h" 命名
+    result["tf_1h"] = result.get("1h", {})
+    result["tf_4h"] = result.get("4h", {})
+
     return result
