@@ -319,8 +319,8 @@
       "post_review": null,
       "quantity": 5.4,
       "binance_order_id": 377721693,
-      "trail_high": null,
-      "trail_low": null,
+      "trail_high": 7.822,
+      "trail_low": 7.783,
       "strategy_profile": "M40",
       "stop_order_error": {
         "error": 400,

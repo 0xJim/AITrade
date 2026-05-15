@@ -1225,7 +1225,7 @@ def check_trailing_stop(trade, price):
         return None
     
     # 获取或初始化跟踪的最高/最低价
-    if "trail_high" not in trade:
+    if "trail_high" not in trade or trade["trail_high"] is None:
         trade["trail_high"] = price
         trade["trail_low"] = price
         return None
@@ -1233,7 +1233,7 @@ def check_trailing_stop(trade, price):
     # 更新极值
     if price > trade["trail_high"]:
         trade["trail_high"] = price
-    if price < trade["trail_low"]:
+    if trade["trail_low"] is None or price < trade["trail_low"]:
         trade["trail_low"] = price
     
     # 检查回撤

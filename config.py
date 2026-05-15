@@ -119,8 +119,8 @@ SPIKE_REQUIRE_EMA_UP = get_config("SPIKE_REQUIRE_EMA_UP", "true").lower() == "tr
 SPIKE_THRESHOLD = float(get_config("SPIKE_THRESHOLD", "0.01"))
 SPIKE_MIN_ATR = float(get_config("SPIKE_MIN_ATR", "0.005"))
 SPIKE_MIN_RSI = float(get_config("SPIKE_MIN_RSI", "50"))
-SPIKE_POSITION_PCT = float(get_config("SPIKE_POSITION_PCT", "0.04"))
-SPIKE_ALLOCATED_BALANCE = float(get_config("SPIKE_ALLOCATED_BALANCE", "300"))
+SPIKE_POSITION_PCT = float(get_config("SPIKE_POSITION_PCT", "0.10"))   # 方案③: 10%保证金
+SPIKE_ALLOCATED_BALANCE = float(get_config("SPIKE_ALLOCATED_BALANCE", "1000"))  # 方案③: 1000U本金
 SPIKE_MAX_OPEN_POSITIONS = int(get_config("SPIKE_MAX_OPEN_POSITIONS", "3"))
 SPIKE_MAX_HOLD_HOURS = float(get_config("SPIKE_MAX_HOLD_HOURS", "8"))
 
