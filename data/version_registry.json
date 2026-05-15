@@ -1,0 +1,183 @@
+{
+  "description": "策略版本注册表 — 每个版本独立保存，不覆盖，用字母后缀迭代",
+  "versions": {
+    "v10": {
+      "name": "v10 — 1h K线双触发",
+      "file": "strategies/v10_strategy.md",
+      "script": "backtest_v10.py",
+      "data": "data/backtest_v10_result.json",
+      "result": "535笔/58.1%/-1,265U/回撤38.9%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v9: 双触发系统"
+    },
+    "v10c": {
+      "name": "v10c — 宽限期优化",
+      "file": "strategies/v10c_strategy.md",
+      "script": "backtest_v10c.py",
+      "data": "data/backtest_v10c_result.json",
+      "result": "30笔/36.7%/-42U/回撤7.2%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v10: 宽限期+延长持仓"
+    },
+    "v11": {
+      "name": "v11 — 黑名单+评分门槛",
+      "file": "strategies/v11_strategy.md",
+      "script": "backtest_v11.py",
+      "data": "data/backtest_v11_result.json",
+      "result": "276笔/66.7%/+1,678U/回撤6.7%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v10c: 后置过滤(黑名单+v8门槛)"
+    },
+    "v12": {
+      "name": "v12 — RSI+仓位+排序优化",
+      "file": "strategies/v12_strategy.md",
+      "script": "backtest_v12.py",
+      "data": "data/backtest_v12_result.json",
+      "result": "39笔/51.3%/+590U/回撤2.2%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v10c: RSI过滤/仓位/排序"
+    },
+    "v13": {
+      "name": "v13 — v12调参版",
+      "file": "strategies/v13_strategy.md",
+      "script": "backtest_v13.py",
+      "data": "data/backtest_v13_result.json",
+      "result": "35笔/48.6%/+221U/回撤1.9%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v12: 参数微调"
+    },
+    "v14": {
+      "name": "v14 — ATR做多限制",
+      "file": "strategies/v14_strategy.md",
+      "script": "backtest_v14.py",
+      "data": "data/backtest_v14_result.json",
+      "result": "42笔/52.4%/+607U/回撤3.2%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v12: 3项数据驱动优化"
+    },
+    "v15": {
+      "name": "v15 — 做空ATR过滤",
+      "file": "strategies/v15_strategy.md",
+      "script": "backtest_v15.py",
+      "data": "data/backtest_v15_result.json",
+      "result": "35笔/40.0%/+25U/回撤4.1%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v14: 2项做空ATR过滤"
+    },
+    "v16": {
+      "name": "v16 — 回归v11广撒网",
+      "file": "strategies/v16_strategy.md",
+      "script": "backtest_v16.py",
+      "data": "data/backtest_v16_result.json",
+      "result": "35笔/37.1%/-124U/回撤5.8%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v11: 合并v14过滤"
+    },
+    "v17": {
+      "name": "v17 — 极端费率+蓄势合并",
+      "file": "strategies/v17_strategy.md",
+      "script": "backtest_v17.py",
+      "data": "data/backtest_v17_result.json",
+      "result": "47笔/42.6%/-79U/回撤6.8%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v14: 合并v6信号+MAX_POS=4"
+    },
+    "v18": {
+      "name": "v18 — v6微调(止损/单币上限/加仓)",
+      "file": "strategies/v18_strategy.md",
+      "script": "backtest_v18.py",
+      "data": "data/backtest_v18_result.json",
+      "result": "74笔/40.5%/-104U/回撤9.0%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v6: 3项微调不改核心"
+    },
+    "v5": {
+      "name": "v5 — 初始版本",
+      "file": "strategies/v5_strategy.md",
+      "script": "backtest_v5.py",
+      "data": "data/backtest_v5_result.json",
+      "result": "11笔/18.2%/-176U/回撤6.6%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "无 (初始版)"
+    },
+    "v6": {
+      "name": "v6 — 极端费率核心",
+      "file": "strategies/v6_strategy.md",
+      "script": "backtest_v6.py",
+      "data": "data/backtest_v6_result.json",
+      "result": "56笔/64.3%/+688U/回撤5.2%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v5: 聚焦极端费率信号"
+    },
+    "v7plus": {
+      "name": "v7+ — 精准狙击宽松版",
+      "file": "strategies/v7plus_strategy.md",
+      "script": "backtest_v7plus.py",
+      "data": "data/backtest_v7plus_result.json",
+      "result": "82笔/58.5%/+215U/回撤9.1%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v6: SL放宽/冷却加长/趋势跟随降低/多持仓"
+    },
+    "v7tuned": {
+      "name": "v7tuned — 精准狙击严格版",
+      "file": "strategies/v7tuned_strategy.md",
+      "script": "backtest_v7tuned.py",
+      "data": "data/backtest_v7tuned_result.json",
+      "result": "21笔/42.9%/-61U/回撤4.4%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v7+: env≥5(原3) / 持仓2(原3)"
+    },
+    "v8": {
+      "name": "v8 — 六维评分系统",
+      "file": "strategies/v8_strategy.md",
+      "script": "backtest_v8.py",
+      "data": "data/backtest_v8_result.json",
+      "result": "14笔/28.6%/-191U/回撤3.9%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v7: 引入v8评分框架"
+    },
+    "v9": {
+      "name": "v9 — 全量扫描",
+      "file": "strategies/v9_strategy.md",
+      "script": "backtest_v9.py",
+      "data": "data/backtest_v9_result.json",
+      "result": "781笔/44.9%/-3,337U/回撤68.1%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v8: ATR危险区不跳过 / env boost×1.2"
+    },
+    "v11a": {
+      "name": "v11a 保守型 (v8≥5硬过滤+做空SL≥7%)",
+      "file": "strategies/v11a_strategy.md",
+      "data": null,
+      "result": "143笔/59.4%/-$317/回撤12.6%",
+      "status": "archived",
+      "date": "2026-05-08",
+      "changes_from": "v11: v8≥5硬过滤(丢掉v8=4核心利润)"
+    },
+    "v11b": {
+      "name": "v11b 激进型 (v8≥6全减半仓位)",
+      "file": "strategies/v11b_strategy.md",
+      "data": null,
+      "result": "276笔/66.7%/+$1,837/回撤5.1%",
+      "status": "candidate",
+      "date": "2026-05-08",
+      "changes_from": "v11: v8≥6仓位减半(pnl×0.5)"
+    }
+  }
+}
