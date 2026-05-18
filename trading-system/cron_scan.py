@@ -67,12 +67,14 @@ SCAN_DECISIONS_FILE = DATA_DIR / "scan_decisions.jsonl"
 # === v4: 动态黑名单 ===
 def update_dynamic_blacklist(data):
     """
-    基于近30天交易数据自动更新黑名单
-    条件: ≥BLACKLIST_MIN_TRADES笔 且 亏损>$BLACKLIST_MAX_LOSS_USD 且 胜率<BLACKLIST_MAX_WIN_RATE
+    基于近30天交易数据自动更新小黑屋。
+    触发后临时隔离 BLACKLIST_QUARANTINE_HOURS 小时，到期自动释放。
     """
     try:
         from config import (BLACKLIST_LOOKBACK_DAYS, BLACKLIST_MIN_TRADES,
-                          BLACKLIST_MAX_LOSS_USD, BLACKLIST_MAX_WIN_RATE, BLACKLIST_FILE)
+                          BLACKLIST_MAX_LOSS_USD, BLACKLIST_MAX_WIN_RATE,
+                          BLACKLIST_SINGLE_LOSS_USD, BLACKLIST_QUARANTINE_HOURS,
+                          BLACKLIST_FILE)
     except ImportError:
         return set()
     
@@ -91,54 +93,109 @@ def update_dynamic_blacklist(data):
         except Exception:
             continue
     
-    by_sym = defaultdict(lambda: {"n": 0, "wins": 0, "pnl": 0})
+    by_sym = defaultdict(lambda: {"n": 0, "wins": 0, "pnl": 0, "worst": 0})
     for t in recent:
         sym = t["symbol"]
+        pnl = t.get("pnl_usd", 0) or 0
         by_sym[sym]["n"] += 1
-        if t.get("pnl_usd", 0) > 0:
+        if pnl > 0:
             by_sym[sym]["wins"] += 1
-        by_sym[sym]["pnl"] += t.get("pnl_usd", 0)
+        by_sym[sym]["pnl"] += pnl
+        by_sym[sym]["worst"] = min(by_sym[sym]["worst"], pnl)
     
-    blacklist = set()
+    quarantine = {}
     for sym, stats in by_sym.items():
-        if (stats["n"] >= BLACKLIST_MIN_TRADES and 
-            stats["pnl"] < -BLACKLIST_MAX_LOSS_USD and
-            stats["wins"] / stats["n"] < BLACKLIST_MAX_WIN_RATE):
-            blacklist.add(sym)
-    
-    # 加载旧黑名单，合并保存
-    old = set()
+        win_rate = stats["wins"] / stats["n"] if stats["n"] else 0
+        repeated_losses = (
+            stats["n"] >= BLACKLIST_MIN_TRADES
+            and stats["pnl"] <= -BLACKLIST_MAX_LOSS_USD
+            and win_rate <= BLACKLIST_MAX_WIN_RATE
+        )
+        single_large_loss = stats["worst"] <= -BLACKLIST_SINGLE_LOSS_USD
+        if repeated_losses or single_large_loss:
+            until = now + timedelta(hours=BLACKLIST_QUARANTINE_HOURS)
+            reason = (
+                f"近{BLACKLIST_LOOKBACK_DAYS}天{stats['n']}笔,"
+                f"胜{win_rate*100:.0f}%,净PnL ${stats['pnl']:.2f},"
+                f"最大单亏 ${stats['worst']:.2f}"
+            )
+            quarantine[sym] = {
+                "reason": reason,
+                "n": stats["n"],
+                "win_rate": round(win_rate, 4),
+                "pnl": round(stats["pnl"], 4),
+                "worst_loss": round(stats["worst"], 4),
+                "quarantined_at": now.isoformat(),
+                "quarantined_until": until.isoformat(),
+            }
+
+    active = {}
     if BLACKLIST_FILE.exists():
         try:
             old_data = json.loads(BLACKLIST_FILE.read_text())
-            old = set(old_data.get("symbols", []))
+            old_quarantine = old_data.get("quarantine", {})
+            for sym, meta in old_quarantine.items():
+                if quarantine_is_active(meta, now):
+                    active[sym] = meta
         except Exception:
             pass
-    all_black = old | blacklist
+    active.update(quarantine)
     
     BLACKLIST_FILE.write_text(json.dumps({
         "updated": now_str(),
-        "symbols": sorted(all_black),
-        "reasons": {sym: f"近{BLACKLIST_LOOKBACK_DAYS}天{by_sym[sym]['n']}笔,胜{by_sym[sym]['wins']/by_sym[sym]['n']*100:.0f}%,亏${by_sym[sym]['pnl']:.0f}" 
-                    for sym in blacklist}
+        "symbols": sorted(active),
+        "quarantine": active,
+        "policy": {
+            "lookback_days": BLACKLIST_LOOKBACK_DAYS,
+            "min_trades": BLACKLIST_MIN_TRADES,
+            "max_loss_usd": BLACKLIST_MAX_LOSS_USD,
+            "max_win_rate": BLACKLIST_MAX_WIN_RATE,
+            "single_loss_usd": BLACKLIST_SINGLE_LOSS_USD,
+            "quarantine_hours": BLACKLIST_QUARANTINE_HOURS,
+        },
     }, ensure_ascii=False, indent=2))
     
-    return all_black
+    return set(active)
+
+
+def quarantine_is_active(meta: dict, now: datetime | None = None) -> bool:
+    """Return True when a dynamic quarantine record has not expired."""
+    if now is None:
+        now = datetime.now(TZ_UTC8)
+    try:
+        until_raw = meta.get("quarantined_until")
+        if not until_raw:
+            return False
+        until = datetime.fromisoformat(until_raw)
+        if until.tzinfo is None:
+            until = until.replace(tzinfo=TZ_UTC8)
+        return until > now
+    except Exception:
+        return False
 
 
 def load_blacklist():
     """加载当前黑名单 = 静态黑名单 + 动态黑名单"""
     combined = set()
     try:
-        from config import STATIC_BLACKLIST
-        combined.update(STATIC_BLACKLIST)
+        from config import ACTIVE_STATIC_BLACKLIST
+        combined.update(ACTIVE_STATIC_BLACKLIST)
     except ImportError:
-        pass
+        try:
+            from config import STATIC_BLACKLIST
+            combined.update(STATIC_BLACKLIST)
+        except ImportError:
+            pass
     try:
         from config import BLACKLIST_FILE
         if BLACKLIST_FILE.exists():
             data = json.loads(BLACKLIST_FILE.read_text())
-            combined.update(data.get("symbols", []))
+            now = datetime.now(TZ_UTC8)
+            quarantine = data.get("quarantine", {})
+            if quarantine:
+                combined.update(sym for sym, meta in quarantine.items() if quarantine_is_active(meta, now))
+            else:
+                combined.update(data.get("symbols", []))
     except Exception:
         pass
     return combined
@@ -309,19 +366,105 @@ def execute_close(symbol: str, direction: str, quantity: float) -> dict:
     return result
 
 
+def handle_protective_stop_failure(trade: dict, stop_result: dict) -> bool:
+    """
+    A real position without an exchange-level stop is not allowed to stay open.
+    Return False so the caller can avoid treating the trade as protected/open.
+    """
+    trade["unprotected_stop_failed"] = True
+    trade["stop_order_error"] = stop_result
+    trade["exit_reason"] = "protective_stop_failed"
+    trade["exit_time"] = now_str()
+
+    close_result = execute_close(trade["symbol"], trade["direction"], trade.get("quantity") or 0)
+    trade["protective_stop_close_result"] = close_result
+
+    if close_result.get("success"):
+        trade["status"] = "closed"
+        trade["binance_close_order_id"] = (close_result.get("order") or {}).get("orderId")
+        log(f"🛑 保护止损失败，已立即平仓 {trade['symbol']} closeOrderId={trade.get('binance_close_order_id')}")
+    else:
+        trade["status"] = "unprotected"
+        notify(f"🚨 无保护仓位未能自动平仓 {trade['symbol']}: {close_result.get('error')}")
+        log(f"🚨 保护止损失败且自动平仓失败 {trade['symbol']}: {close_result}")
+
+    return False
+
+
 # ═══════════════════════════════════════════
 # v5: 信号扫描 — 三重确认 (费率+趋势+RSI)
 # ═══════════════════════════════════════════
 
+
+def build_closed_15m_spike_candidate(sym: str, fr: float, chg: float, vol: float) -> dict | None:
+    """Build a closed-15m anomaly candidate only when the candle looks clean."""
+    klines_15m = get_klines(sym, "15m", 8)
+    if not klines_15m or len(klines_15m) < 3:
+        return None
+
+    closed = klines_15m[-2]
+    open_15m = float(closed[1])
+    high_15m = float(closed[2])
+    low_15m = float(closed[3])
+    close_15m = float(closed[4])
+    if open_15m <= 0:
+        return None
+
+    move_pct = (close_15m - open_15m) / open_15m * 100
+    if abs(move_pct) < CLOSED_15M_ANOMALY_THRESHOLD_PCT:
+        return None
+
+    candle_range = max(high_15m - low_15m, 0)
+    body = abs(close_15m - open_15m)
+    body_ratio = body / candle_range if candle_range > 0 else 0
+    if body_ratio < CLOSED_15M_ANOMALY_BODY_RATIO_MIN:
+        return None
+
+    direction = "long" if move_pct > 0 else "short"
+    if direction == "long":
+        close_position = (close_15m - low_15m) / candle_range if candle_range > 0 else 0
+    else:
+        close_position = (high_15m - close_15m) / candle_range if candle_range > 0 else 0
+    if close_position < CLOSED_15M_ANOMALY_CLOSE_POSITION_MIN:
+        return None
+
+    prior = klines_15m[:-2]
+    quote_volume = float(closed[7]) if len(closed) > 7 else float(closed[5])
+    prior_volumes = [float(k[7]) if len(k) > 7 else float(k[5]) for k in prior if float(k[5]) >= 0]
+    avg_prior_volume = sum(prior_volumes) / len(prior_volumes) if prior_volumes else 0
+    volume_ratio = quote_volume / avg_prior_volume if avg_prior_volume > 0 else 0
+    if volume_ratio < CLOSED_15M_ANOMALY_VOLUME_RATIO_MIN:
+        return None
+
+    strength = "A" if abs(move_pct) >= CLOSED_15M_ANOMALY_STRONG_PCT else "B"
+    return {
+        "symbol": sym,
+        "type": "closed_15m_spike",
+        "direction": direction,
+        "strength": strength,
+        "price": close_15m,
+        "fr": fr,
+        "change": move_pct,
+        "change_24h": chg,
+        "vol": vol,
+        "body_ratio": round(body_ratio, 4),
+        "close_position": round(close_position, 4),
+        "volume_ratio": round(volume_ratio, 4),
+        "kline_close_time": int(closed[6]) if len(closed) > 6 else None,
+        "reason": f"15m收线异动{move_pct:+.2f}% 量比{volume_ratio:.1f} 实体{body_ratio:.2f}",
+    }
+
+
 def quick_scan(open_symbols, cooldowns):
     """
-    快速扫描: 筛选极端费率/暴涨暴跌候选
+    快速扫描: 优先用15m已收线异动生成候选，再补充极端费率/暴涨暴跌候选。
     v5: 阈值收紧，只保留高质量信号
     """
     tickers = get_qualified_symbols()
     funding = get_funding_rates()
     now = datetime.now(TZ_UTC8)
     candidates = []
+    checked_15m = 0
     
     for t in tickers:
         sym = t["symbol"]
@@ -341,6 +484,16 @@ def quick_scan(open_symbols, cooldowns):
         chg = float(t.get("priceChangePercent", 0))
         price = float(t.get("lastPrice", 0))
         vol = float(t.get("quoteVolume", 0))
+
+        if CLOSED_15M_ANOMALY_ENABLED and checked_15m < CLOSED_15M_ANOMALY_MAX_CHECK:
+            checked_15m += 1
+            try:
+                spike_candidate = build_closed_15m_spike_candidate(sym, fr, chg, vol)
+                if spike_candidate:
+                    candidates.append(spike_candidate)
+                    continue
+            except Exception:
+                pass
         
         if fr < EXTREME_NEG_FUNDING:
             # v5: 负费率做多需要BTC不暴跌 + RSI超卖确认
@@ -713,7 +866,7 @@ def v8_kelly_position(balance: float, win_rate: float, rr: float,
     macro_factor = max(0.5, 1.0 - macro_dist * 0.5)
     
     pos_pct = kelly * V8_KELLY_FRACTION * quality_factor * macro_factor * 100
-    pos_pct = max(2, min(20, pos_pct))  # 2%-20%范围
+    pos_pct = max(V8_POSITION_PCT_MIN, min(V8_POSITION_PCT_MAX, pos_pct))
     
     return round(balance * pos_pct / 100, 2)
 
@@ -727,9 +880,10 @@ def deep_check(cand):
     
     # === 1. 费率历史验证 ===
     fr_hist = get_funding_history(sym, 8)
-    if not fr_hist:
+    funding_required = cand["type"] in ("extreme_neg_funding", "extreme_pos_funding")
+    if funding_required and not fr_hist:
         return None
-    avg = sum(fr_hist) / len(fr_hist)
+    avg = sum(fr_hist) / len(fr_hist) if fr_hist else cand.get("fr", 0)
     
     if cand["type"] == "extreme_neg_funding":
         neg = sum(1 for r in fr_hist if r < -0.03)
@@ -759,6 +913,23 @@ def deep_check(cand):
         if pb < 5: return None  # v3: 恢复回落阈值 8→5（与signals.py统一）
         cand["reason"] = f"24h暴涨{cand['change']:+.1f}% 后回落{pb:.0f}%"
         cand["strength"] = "A" if pb > 10 else "B"  # v3: 与signals.py统一
+    elif cand["type"] == "closed_15m_spike":
+        klines_15m = get_klines(sym, "15m", 3)
+        if not klines_15m or len(klines_15m) < 2:
+            return None
+        closed = klines_15m[-2]
+        open_15m = float(closed[1])
+        close_15m = float(closed[4])
+        if open_15m <= 0:
+            return None
+        move_pct = (close_15m - open_15m) / open_15m * 100
+        expected_direction = "long" if move_pct > 0 else "short"
+        if abs(move_pct) < CLOSED_15M_ANOMALY_THRESHOLD_PCT or expected_direction != cand["direction"]:
+            return None
+        cand["price"] = close_15m
+        cand["change"] = move_pct
+        cand["strength"] = "A" if abs(move_pct) >= CLOSED_15M_ANOMALY_STRONG_PCT else "B"
+        cand["reason"] = f"15m收线异动{move_pct:+.2f}%"
     elif cand["type"] in ("oi_surge", "funding_flip_neg", "funding_flip_pos"):
         # OI异动和费率翻转: 不需要费率历史验证(quick_scan已确认)
         # 但在deep_check中校验OI是否仍然有效(对于oi_surge)
@@ -1860,9 +2031,9 @@ def main():
                     trade["stop_loss"],
                 )
                 if isinstance(stop_result, dict) and "error" in stop_result:
-                    trade["stop_order_error"] = stop_result
                     notify(f"⚠️ 止损单挂单失败 {verified['symbol']}: {stop_result}")
                     log(f"⚠️ STOP_MARKET止损单失败: {stop_result}")
+                    handle_protective_stop_failure(trade, stop_result)
                 else:
                     trade["stop_order_id"] = stop_result.get("orderId") if isinstance(stop_result, dict) else None
                     log(f"✅ STOP_MARKET止损单已挂 orderId={trade.get('stop_order_id')}")

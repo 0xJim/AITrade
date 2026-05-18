@@ -7,11 +7,21 @@ import hmac
 import hashlib
 import requests
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
 from config import DATA_FAPI, TRADE_FAPI, MIN_VOLUME_M, BINANCE_API_KEY, BINANCE_API_SECRET
 
 TZ_UTC8 = timezone(timedelta(hours=8))
+
+
+def _as_order_decimal(value) -> str:
+    """Return a Binance-friendly decimal string without scientific notation."""
+    try:
+        decimal_value = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return str(value)
+    return format(decimal_value, "f")
 
 
 def _sign(params: dict) -> dict:
@@ -143,7 +153,8 @@ def set_leverage(symbol: str, leverage: int) -> dict:
 
 def place_order(symbol: str, side: str, quantity: float,
                 order_type: str = "MARKET", price: float = None,
-                stop_price: float = None, reduce_only: bool = False) -> dict:
+                stop_price: float = None, reduce_only: bool = False,
+                working_type: str = None) -> dict:
     """
     下单
     side: BUY / SELL
@@ -153,13 +164,15 @@ def place_order(symbol: str, side: str, quantity: float,
         "symbol": symbol,
         "side": side,
         "type": order_type,
-        "quantity": quantity,
+        "quantity": _as_order_decimal(quantity),
     }
     if price and order_type == "LIMIT":
-        params["price"] = price
+        params["price"] = _as_order_decimal(price)
         params["timeInForce"] = "GTC"
     if stop_price:
-        params["stopPrice"] = stop_price
+        params["stopPrice"] = _as_order_decimal(stop_price)
+    if working_type:
+        params["workingType"] = working_type
     if reduce_only:
         params["reduceOnly"] = "true"
     return signed_post("/fapi/v1/order", params)
@@ -193,6 +206,7 @@ def place_stop_loss_order(symbol: str, quantity: float, direction: str, stop_pri
         order_type="STOP_MARKET",
         stop_price=stop_price,
         reduce_only=True,
+        working_type="MARK_PRICE",
     )
 
 
