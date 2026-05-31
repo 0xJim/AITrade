@@ -197,17 +197,23 @@ def close_position(symbol: str, quantity: float, direction: str) -> dict:
 
 
 def place_stop_loss_order(symbol: str, quantity: float, direction: str, stop_price: float) -> dict:
-    """挂交易所级 reduceOnly STOP_MARKET 止损单。"""
+    """挂交易所级 reduceOnly STOP_MARKET 止损单。
+
+    Binance Futures Testnet now rejects STOP_MARKET on /fapi/v1/order with
+    -4120 and requires the Algo Order endpoint for conditional stops.
+    """
     side = "SELL" if direction == "long" else "BUY"
-    return place_order(
-        symbol,
-        side,
-        quantity,
-        order_type="STOP_MARKET",
-        stop_price=stop_price,
-        reduce_only=True,
-        working_type="MARK_PRICE",
-    )
+    return signed_post("/fapi/v1/algoOrder", {
+        "symbol": symbol,
+        "side": side,
+        "positionSide": "BOTH",
+        "algoType": "CONDITIONAL",
+        "type": "STOP_MARKET",
+        "quantity": _as_order_decimal(quantity),
+        "triggerPrice": _as_order_decimal(stop_price),
+        "reduceOnly": "true",
+        "workingType": "MARK_PRICE",
+    })
 
 
 def cancel_all_orders(symbol: str) -> dict:

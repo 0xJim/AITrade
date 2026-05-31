@@ -44,13 +44,15 @@ class ProtectiveStopOrderTests(unittest.TestCase):
         )
 
         self.assertEqual(result["orderId"], 123)
-        self.assertEqual(calls[0][0], "/fapi/v1/order")
+        self.assertEqual(calls[0][0], "/fapi/v1/algoOrder")
         params = calls[0][1]
         self.assertEqual(params["symbol"], "LABUSDT")
         self.assertEqual(params["side"], "SELL")
+        self.assertEqual(params["positionSide"], "BOTH")
+        self.assertEqual(params["algoType"], "CONDITIONAL")
         self.assertEqual(params["type"], "STOP_MARKET")
         self.assertEqual(params["quantity"], "12.34560000")
-        self.assertEqual(params["stopPrice"], "0.12345000")
+        self.assertEqual(params["triggerPrice"], "0.12345000")
         self.assertEqual(params["reduceOnly"], "true")
         self.assertEqual(params["workingType"], "MARK_PRICE")
 

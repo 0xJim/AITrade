@@ -2035,8 +2035,12 @@ def main():
                     log(f"⚠️ STOP_MARKET止损单失败: {stop_result}")
                     handle_protective_stop_failure(trade, stop_result)
                 else:
-                    trade["stop_order_id"] = stop_result.get("orderId") if isinstance(stop_result, dict) else None
-                    log(f"✅ STOP_MARKET止损单已挂 orderId={trade.get('stop_order_id')}")
+                    if isinstance(stop_result, dict):
+                        trade["stop_order_id"] = stop_result.get("orderId") or stop_result.get("algoId")
+                        trade["stop_algo_id"] = stop_result.get("algoId")
+                    else:
+                        trade["stop_order_id"] = None
+                    log(f"✅ STOP_MARKET止损单已挂 id={trade.get('stop_order_id')}")
                 log(f"✅ 真实下单成功 orderId={trade['binance_order_id']}")
             else:
                 notify(f"⚠️ 真实下单失败 {verified['symbol']}: {open_result['error']}")
