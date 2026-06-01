@@ -2126,6 +2126,7 @@ def main():
                 else:
                     trade["stop_loss"] = round(trade["entry_price"] * (1 + sl_pct), price_precision)
                     trade["take_profit"] = round(trade["entry_price"] * (1 - tp_pct), price_precision)
+                # 币安测试网不支持STOP_MARKET（-4120需Algo Order API），改用纯软件止损
                 stop_result = place_stop_loss_order(
                     verified["symbol"],
                     trade["quantity"],
@@ -2133,15 +2134,17 @@ def main():
                     trade["stop_loss"],
                 )
                 if isinstance(stop_result, dict) and "error" in stop_result:
-                    notify(f"⚠️ 止损单挂单失败 {verified['symbol']}: {stop_result}")
-                    log(f"⚠️ STOP_MARKET止损单失败: {stop_result}")
-                    handle_protective_stop_failure(trade, stop_result)
+                    # 挂单失败不紧急平仓，改用软件止损兜底
+                    trade["stop_order_id"] = None
+                    trade["software_stop_only"] = True
+                    log(f"⚠️ STOP_MARKET止损单失败({stop_result.get('msg','')[:80]})，已切换软件止损")
                 else:
                     if isinstance(stop_result, dict):
                         trade["stop_order_id"] = stop_result.get("orderId") or stop_result.get("algoId")
                         trade["stop_algo_id"] = stop_result.get("algoId")
                     else:
                         trade["stop_order_id"] = None
+                    trade["software_stop_only"] = False
                     log(f"✅ STOP_MARKET止损单已挂 id={trade.get('stop_order_id')}")
                 log(f"✅ 真实下单成功 orderId={trade['binance_order_id']}")
             else:
