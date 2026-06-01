@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Run cron_scan.py repeatedly with the G60C Clean Spike testnet profile."""
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parent
+INTERVAL_SECONDS = int(os.environ.get("G60C_LOOP_INTERVAL", "60"))
+
+
+def main() -> int:
+    env = os.environ.copy()
+    env.update({
+        "STRATEGY_PROFILE": "G60C",
+        "BINANCE_TESTNET": "true",
+        "INITIAL_BALANCE": env.get("INITIAL_BALANCE", "1000"),
+        "MAX_OPEN_POSITIONS": env.get("MAX_OPEN_POSITIONS", "3"),
+        "POSITION_PCT": env.get("POSITION_PCT", "4"),
+        "V8_POSITION_PCT_MAX": env.get("V8_POSITION_PCT_MAX", "4"),
+        "CLOSED_15M_ANOMALY_ENABLED": "true",
+        "CLOSED_15M_ANOMALY_THRESHOLD_PCT": env.get("CLOSED_15M_ANOMALY_THRESHOLD_PCT", "1.5"),
+        "CLOSED_15M_ANOMALY_VOLUME_RATIO_MIN": env.get("CLOSED_15M_ANOMALY_VOLUME_RATIO_MIN", "1.8"),
+        "CLOSED_15M_ANOMALY_BODY_RATIO_MIN": env.get("CLOSED_15M_ANOMALY_BODY_RATIO_MIN", "0.55"),
+        "CLOSED_15M_ANOMALY_CLOSE_POSITION_MIN": env.get("CLOSED_15M_ANOMALY_CLOSE_POSITION_MIN", "0.65"),
+        "BLACKLIST_MIN_TRADES": env.get("BLACKLIST_MIN_TRADES", "2"),
+        "BLACKLIST_MAX_LOSS_USD": env.get("BLACKLIST_MAX_LOSS_USD", "18"),
+        "BLACKLIST_MAX_WIN_RATE": env.get("BLACKLIST_MAX_WIN_RATE", "0.45"),
+        "BLACKLIST_SINGLE_LOSS_USD": env.get("BLACKLIST_SINGLE_LOSS_USD", "10"),
+        "BLACKLIST_QUARANTINE_HOURS": env.get("BLACKLIST_QUARANTINE_HOURS", "72"),
+        "BLACKLIST_SHORT_V8_SCORE_THRESHOLD": env.get("BLACKLIST_SHORT_V8_SCORE_THRESHOLD", "4"),
+        "BLACKLIST_SHORT_POSITION_FACTOR": env.get("BLACKLIST_SHORT_POSITION_FACTOR", "0.35"),
+        "PYTHONUNBUFFERED": "1",
+    })
+
+    while True:
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        print(f"\n===== {stamp} G60C Clean Spike scan =====", flush=True)
+        result = subprocess.run([sys.executable, "cron_scan.py"], cwd=BASE_DIR, env=env)
+        print(f"===== exit={result.returncode}; sleeping {INTERVAL_SECONDS}s =====", flush=True)
+        time.sleep(INTERVAL_SECONDS)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
