@@ -197,17 +197,30 @@ def close_position(symbol: str, quantity: float, direction: str) -> dict:
 
 
 def place_stop_loss_order(symbol: str, quantity: float, direction: str, stop_price: float) -> dict:
-    """挂交易所级 reduceOnly STOP_MARKET 止损单。"""
+    """挂交易所级 reduceOnly STOP_MARKET 止损单。
+    
+    优先使用 /fapi/v1/algoOrder（币安新规），新规端点如果不可用则
+    回退到 /fapi/v1/order。调用方应检查返回值中的 "error" 字段并走软件止损兜底。
+    """
     side = "SELL" if direction == "long" else "BUY"
-    return place_order(
-        symbol,
-        side,
-        quantity,
-        order_type="STOP_MARKET",
-        stop_price=stop_price,
-        reduce_only=True,
-        working_type="MARK_PRICE",
-    )
+    params = {
+        "symbol": symbol,
+        "side": side,
+        "quantity": _as_order_decimal(quantity),
+        "type": "STOP_MARKET",
+        "stopPrice": _as_order_decimal(stop_price),
+        "reduceOnly": "true",
+        "workingType": "MARK_PRICE",
+    }
+
+    # 优先 algo endpoint（符合币安 -4120 提示）
+    algo_result = signed_post("/fapi/v1/algoOrder", dict(params))
+    if isinstance(algo_result, dict) and "error" not in algo_result:
+        return algo_result
+
+    # 回退到传统 endpoint
+    legacy_result = signed_post("/fapi/v1/order", dict(params))
+    return legacy_result
 
 
 def cancel_all_orders(symbol: str) -> dict:
