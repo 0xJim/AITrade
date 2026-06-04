@@ -101,14 +101,24 @@ AITrade/
 │       ├── backtest_v11j_compare.json    # 对比结果
 │       ├── backtest_all_optimizations.py # 15方案扫描脚本
 │       └── backtest_v11i_optimization_sweep.json # 15方案扫描结果
-├── trading-system/              # 当前在线交易系统(v11j)
+├── trading-system/              # 当前运行与通用回测系统
+│   ├── README.md                # 运行区规则
+│   ├── universal_backtest.py    # 通用参数化回测入口
+│   ├── backtest_web.py          # 本地网页回测看板
 │   ├── cron_scan.py             # 扫描调度入口(v11j)
-│   ├── config.py                # 配置文件(v11j)
+│   ├── config.py                # 配置、安全锁、Binance端点拆分
 │   ├── binance_api.py           # 币安API
-│   ├── backtest.py              # 主回测脚本
 │   ├── notifier.py              # 通知模块(微信+Telegram)
-│   └── review_db.py             # 复盘数据库
+│   ├── review_db.py             # 复盘数据库
+│   ├── backtesting/             # 统一回测引擎和数据源
+│   ├── configs/                 # 策略变量JSON
+│   ├── data/                    # 本地运行数据/报告/缓存（Git忽略）
+│   └── legacy_backtests/        # 旧研究脚本，仅历史复现
+├── scripts/                     # 项目健康检查脚本
+│   └── health_check.py
 ├── docs/                        # 文档
+│   ├── project-structure.md     # 文件夹规范
+│   ├── universal-backtesting.md # 通用回测说明
 │   └── strategy-evolution.md    # 策略演进详细文档
 └── data/                        # 全局数据
     └── all_strategies_normalized_1000u.json
@@ -123,19 +133,29 @@ AITrade/
 | `binance_api.py` | 币安合约API封装(含多时间框架1h+4h) |
 | `notifier.py` | 微信+Telegram双通道通知+自动标签建议 |
 | `review_db.py` | SQLite复盘数据库(交易+标签+笔记) |
-| `backtest.py` | 主回测脚本(币安正式API, 1h K线) |
 | `universal_backtest.py` | 通用参数化回测入口(JSON策略变量 + 统一模拟引擎) |
 | `backtest_web.py` | 本地网页回测看板 |
+| `legacy_backtests/` | 已废弃旧回测脚本，仅用于历史结果复现 |
+| `scripts/health_check.py` | 一键健康检查 |
 
 ## ✅ 当前验证状态
 
 - 本地 Python 编译通过
 - `cron_scan` 主入口可导入
 - `review_db` 可导入（项目内 `data/review.db`）
-- sample 通用回测通过（30天 BTC/ETH，40笔，ROI 14.6%）
-- L7 profile 不崩溃（`MAX_LOSS_PER_TRADE=None`）
-- Binance production public data 需要在可访问 fapi.binance.com 的网络环境验证
-- testnet/live 前必须先确认 `DATA_FAPI` 与 `TRADE_FAPI` 分离
+- sample 数据源健康检查通过
+- sample 固定窗口通用回测通过（2026-04-12 10:00:00 至 2026-05-12 10:00:00，30天 BTC/ETH，47笔，ROI 8.35%，PF 1.377，最大回撤 6.12%）
+- 环境变量可覆盖 `.env.binance`，便于明确切换 testnet/live 检查
+- 实盘交易仍由三重安全锁控制：`BINANCE_TESTNET=false` + `ENABLE_LIVE_TRADING=true` + `LIVE_CONFIRM=I_UNDERSTAND_MAINNET_RISK`
+- Binance production public K线在可访问外网环境验证通过（`BTCUSDT 1h candles=24`）
+- 默认沙盒网络可能无法解析 `fapi.binance.com`，这属于运行环境网络限制，不是回测代码问题
+
+一键检查：
+
+```bash
+python3 scripts/health_check.py
+python3 scripts/health_check.py --binance
+```
 
 ## 🧪 通用回测系统
 

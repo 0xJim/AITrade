@@ -1,0 +1,82 @@
+{
+  "strategy": "S22B v11j-G60B",
+  "source": "strategies/S07-v10/data/backtest_v10_result.json",
+  "basis": {
+    "initial_balance": 1000,
+    "fee_rate": 0.0004,
+    "slippage_rate": 0.0005,
+    "window": "2025-05-14T10:00:00+08:00/2026-05-14T10:00:00+08:00"
+  },
+  "filters": {
+    "exclude_symbols": [
+      "ADAUSDT",
+      "LDOUSDT",
+      "SKYAIUSDT",
+      "SNDKUSDT",
+      "SUIUSDT",
+      "TONUSDT",
+      "VVVUSDT",
+      "XRPUSDT"
+    ],
+    "min_quality": 85,
+    "min_mtf_agree": 4,
+    "max_atr_pct": 4.5,
+    "max_sl_pct": 7.0,
+    "consec_loss_mult": 0.5,
+    "max_loss_per_trade": 60.0
+  },
+  "result": {
+    "total_trades": 363,
+    "wins": 231,
+    "losses": 132,
+    "win_rate": 63.6,
+    "total_pnl": 601.27,
+    "final_balance": 1601.27,
+    "gross_profit": 1430.83,
+    "gross_loss": 829.56,
+    "profit_factor": 1.72,
+    "max_drawdown": 3.31,
+    "max_dd_peak": 1280.69,
+    "max_dd_trough": 1238.25,
+    "profit_months": 11,
+    "total_months": 13,
+    "monthly_win_rate": 84.6,
+    "max_consec_loss": 7,
+    "max_single_loss": -25.42,
+    "top_10_losses": [
+      -25.42,
+      -19.9,
+      -19.72,
+      -15.71,
+      -13.96,
+      -13.64,
+      -12.8,
+      -12.49,
+      -12.44,
+      -12.29
+    ],
+    "roi": 60.1,
+    "roi_dd_ratio": 18.14,
+    "monthly_pnl": {
+      "2025-05": -0.41,
+      "2025-06": 4.6,
+      "2025-07": 25.6,
+      "2025-08": 124.38,
+      "2025-09": 0.37,
+      "2025-10": 62.71,
+      "2025-11": 9.79,
+      "2025-12": -0.1,
+      "2026-01": 18.37,
+      "2026-02": 105.47,
+      "2026-03": 68.01,
+      "2026-04": 98.3,
+      "2026-05": 84.23
+    },
+    "skipped_by_loss_cap": 0,
+    "loss_cap_savings": 0,
+    "capped_win_count": 0,
+    "capped_loss_count": 0,
+    "gross_profit_after_cap": 1430.83,
+    "gross_loss_after_cap": 829.56
+  }
+}

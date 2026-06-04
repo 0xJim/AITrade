@@ -21,6 +21,7 @@ Fast local smoke test with deterministic sample data:
 
 ```bash
 python3 trading-system/universal_backtest.py --source sample --days 30 --symbols BTCUSDT,ETHUSDT
+python3 trading-system/universal_backtest.py --source sample --days 30 --end 2026-05-12T10:00:00+08:00 --symbols BTCUSDT,ETHUSDT
 ```
 
 Production Binance public data:
@@ -39,6 +40,19 @@ Reports are written to:
 
 ```text
 trading-system/data/backtest_reports/
+```
+
+Run the standard project health check before strategy research:
+
+```bash
+python3 scripts/health_check.py
+```
+
+When external network access is available, include Binance public K-line
+verification:
+
+```bash
+python3 scripts/health_check.py --binance
 ```
 
 ## Web Dashboard
@@ -87,6 +101,15 @@ Common variables to change:
 Keep one JSON per strategy variant, then compare reports from the same engine.
 That avoids each strategy carrying a separate backtest script with slightly
 different assumptions.
+
+Legacy one-off backtest scripts now live in:
+
+```text
+trading-system/legacy_backtests/
+```
+
+They are retained only for historical reproduction. New experiments should be
+JSON configs under `trading-system/configs/`.
 
 ## Validation Rule
 

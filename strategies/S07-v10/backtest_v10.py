@@ -48,6 +48,7 @@ if "--from-params" in sys.argv:
 
 FAPI_LIVE = "https://fapi.binance.com"
 TZ_UTC8 = timezone(timedelta(hours=8))
+FIXED_15M_MODE = "--fixed-15m" in sys.argv
 
 # === 基础参数 ===
 INITIAL_BALANCE = P("基础", "初始资金", 5000.0)
@@ -82,7 +83,7 @@ MTF_FRAMES = [f for f in MTF_FRAMES if f.lstrip("-") in FRAME_MINUTES]
 MTF_CONSISTENCY_WEIGHT = P("多时间框架", "一致性权重", 0.30)
 MTF_LARGE_WEIGHT = P("多时间框架", "大框架权重", 0.15)
 MTF_SMALL_WEIGHT = P("多时间框架", "小框架权重", 0.10)
-MTF_MIN_AGREE = P("多时间框架", "趋势一致最低", 3)
+MTF_MIN_AGREE = P("多时间框架", "趋势一致最低", 4 if FIXED_15M_MODE else 3)
 
 # === 止损止盈 ===
 ATR_SL_MULTIPLIER = P("止损止盈", "ATR止损乘数", 1.5)
@@ -94,13 +95,14 @@ EMA_SLOW = P("技术指标", "EMA慢线", 21)
 RSI_PERIOD = P("技术指标", "RSI周期", 14)
 
 # === 入场 ===
-V8_SIGNAL_QUALITY_MIN = P("入场过滤", "信号质量最低分", 55)
+V8_SIGNAL_QUALITY_MIN = P("入场过滤", "信号质量最低分", 85 if FIXED_15M_MODE else 55)
 V8_RR_MIN = P("入场过滤", "RR比最低", 1.3)
 # 方向×质量×ATR过滤（回测验证最优）
-LONG_ATR_MAX = P("入场过滤", "做多ATR上限", 0.05)    # 做多：ATR<5%
-LONG_QUALITY_MIN = P("入场过滤", "做多最低质量", 80)   # 做多：quality≥80
+LONG_ATR_MAX = P("入场过滤", "做多ATR上限", 0.045 if FIXED_15M_MODE else 0.05)    # 做多：ATR<5%
+LONG_QUALITY_MIN = P("入场过滤", "做多最低质量", 85 if FIXED_15M_MODE else 80)   # 做多：quality≥80
 SHORT_QUALITY_MIN = P("入场过滤", "做空最低质量", 85)   # 做空：quality≥85
 SHORT_ATR_MIN = P("入场过滤", "做空ATR下限", 0.03)     # 做空：ATR≥3%
+MAX_SL_PCT = P("入场过滤", "最大止损百分比", 0.07 if FIXED_15M_MODE else 0.99)
 
 # === Kelly ===
 V8_KELLY_FRACTION = P("Kelly仓位", "Kelly保守系数", 0.25)
@@ -521,10 +523,12 @@ def run_backtest():
     print(f"时间: {START_TIME.strftime('%Y-%m-%d')} ~ {END_TIME.strftime('%Y-%m-%d')}")
     print(f"资金: ${INITIAL_BALANCE:.0f} | 杠杆: {LEVERAGE}x")
     print(f"异动阈值: {SPIKE_THRESHOLD*100}% | 真实15m K线")
+    print(f"15m严格修复: {'ON' if FIXED_15M_MODE else 'OFF'}")
     print(f"费率异动: 做多<{FR_LONG_THRESHOLD*100}% 做空>{FR_SHORT_THRESHOLD*100}%")
     print(f"入场过滤: 质量≥{V8_SIGNAL_QUALITY_MIN} RR≥{V8_RR_MIN}")
     print(f"做多过滤: ATR<{LONG_ATR_MAX*100}% & 质量≥{LONG_QUALITY_MIN}")
     print(f"做空过滤: 质量≥{SHORT_QUALITY_MIN} & ATR≥{SHORT_ATR_MIN*100}%")
+    print(f"MTF硬过滤: agree≥{MTF_MIN_AGREE} | SL≤{MAX_SL_PCT*100:.1f}%")
     print(f"多时间框架: {MTF_FRAMES}")
     print("=" * 60)
     
@@ -951,6 +955,9 @@ def run_backtest():
                     klines_by_frame[frame] = frame_kl[:idx_frame]
             
             mtf_result = mtf_analyze(klines_by_frame, direction)
+            if FIXED_15M_MODE and not mtf_result["meets_threshold"]:
+                signals_filtered += 1
+                continue
             
             # 六维评分
             signal = {
@@ -970,6 +977,9 @@ def run_backtest():
                 signals_filtered += 1
                 continue
             if rr < V8_RR_MIN:
+                signals_filtered += 1
+                continue
+            if sl_pct > MAX_SL_PCT:
                 signals_filtered += 1
                 continue
             

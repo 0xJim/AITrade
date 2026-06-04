@@ -82,6 +82,59 @@ class ProtectiveStopOrderTests(unittest.TestCase):
         self.assertTrue(trade["unprotected_stop_failed"])
         self.assertEqual(closed, [("TONUSDT", "short", 10)])
 
+    def test_open_trade_can_be_marked_software_stop_only(self):
+        cron_scan = importlib.import_module("cron_scan")
+        trade = {
+            "symbol": "INJUSDT",
+            "direction": "long",
+            "status": "open",
+            "stop_loss": 6.12,
+            "take_profit": 7.5,
+        }
+
+        cron_scan.mark_software_stop_only(trade, "testnet_stop_endpoint_unavailable")
+
+        self.assertTrue(trade["software_stop_only"])
+        self.assertEqual(trade["stop_protection_mode"], "software")
+        self.assertIsNone(trade["stop_order_id"])
+        self.assertEqual(trade["stop_order_error"], "testnet_stop_endpoint_unavailable")
+
+    def test_historical_sync_close_without_real_fill_is_zeroed(self):
+        cron_scan = importlib.import_module("cron_scan")
+        data = {
+            "trades": [
+                {
+                    "id": "001",
+                    "symbol": "RIVERUSDT",
+                    "status": "closed",
+                    "exit_reason": "同步平仓(交易所无持仓)",
+                    "quantity": 0,
+                    "binance_order_id": None,
+                    "pnl_usd": 18.6,
+                    "pnl_pct": 4.2,
+                },
+                {
+                    "id": "002",
+                    "symbol": "TONUSDT",
+                    "status": "closed",
+                    "exit_reason": "止盈",
+                    "quantity": 15,
+                    "binance_order_id": 12345,
+                    "pnl_usd": 9.5,
+                    "pnl_pct": 1.8,
+                },
+            ]
+        }
+
+        changed = cron_scan.clean_historical_fake_sync_pnl(data)
+
+        self.assertEqual(changed, 1)
+        cleaned = data["trades"][0]
+        self.assertEqual(cleaned["pnl_usd"], 0)
+        self.assertEqual(cleaned["pnl_pct"], 0)
+        self.assertEqual(cleaned["pnl_source"], "daily_review_exchange_sync_zero_fill")
+        self.assertEqual(data["trades"][1]["pnl_usd"], 9.5)
+
     def test_recent_loss_symbols_are_not_hardcoded_without_trade_evidence(self):
         cron_scan = importlib.import_module("cron_scan")
         config = importlib.import_module("config")
