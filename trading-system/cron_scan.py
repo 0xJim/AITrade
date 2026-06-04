@@ -607,6 +607,8 @@ def quick_scan(open_symbols, cooldowns):
                     if oi_chg_pct >= OI_SURGE_PCT:
                         # OI增加+价格涨=做多, OI+价格跌=做空
                         oi_direction = "long" if chg > 0 else "short"
+                        if OI_SURGE_LONG_ONLY and oi_direction != "long":
+                            continue
                         oi_strength = "A" if oi_chg_pct >= 10 else "B"
                         candidates.append({"symbol": sym, "type": "oi_surge",
                             "direction": oi_direction, "strength": oi_strength,
@@ -637,6 +639,9 @@ def quick_scan(open_symbols, cooldowns):
         except Exception:
             pass
     
+    if ENABLE_ONLY_SIGNAL_TYPES:
+        candidates = [c for c in candidates if c.get("type") in ENABLE_ONLY_SIGNAL_TYPES]
+
     return candidates
 
 
@@ -978,10 +983,42 @@ def deep_check(cand):
         cand["change"] = move_pct
         cand["strength"] = "A" if abs(move_pct) >= CLOSED_15M_ANOMALY_STRONG_PCT else "B"
         cand["reason"] = f"15m收线异动{move_pct:+.2f}%"
+        # BTC EMA趋势硬过滤: 仅做多方向受限，BTC空头市场拒绝spike long
+        # fail-closed: BTC数据异常时也拒绝，不放行
+        if cand["direction"] == "long" and SPIKE_LONG_BTC_EMA_FILTER:
+            try:
+                btc_tech = get_technical_indicators("BTCUSDT")
+                btc_ema_fast = btc_tech.get("ema_fast", 0)
+                btc_ema_slow = btc_tech.get("ema_slow", 0)
+                if not btc_ema_fast or not btc_ema_slow:
+                    # BTC 数据不可用 → fail-closed，拒绝
+                    cand["_btc_filter_reject"] = True
+                    cand["_btc_reject_reason"] = "btc_data_unavailable"
+                    return None
+                if btc_ema_fast < btc_ema_slow * (1 - SPIKE_LONG_BTC_EMA_BAND):
+                    # BTC 明确下行 → 拒绝，记录 shadow
+                    cand["_btc_filter_reject"] = True
+                    cand["_btc_reject_reason"] = "btc_downtrend"
+                    cand["_btc_ema_fast"] = round(btc_ema_fast, 2)
+                    cand["_btc_ema_slow"] = round(btc_ema_slow, 2)
+                    try:
+                        from btc_filter_shadow import record_shadow
+                        record_shadow(cand, "btc_downtrend", btc_ema_fast, btc_ema_slow)
+                    except Exception:
+                        pass
+                    return None
+                cand["_btc_trend"] = "up" if btc_ema_fast > btc_ema_slow * (1 + SPIKE_LONG_BTC_EMA_BAND) else "neutral"
+            except Exception as e:
+                # API 异常 → fail-closed，拒绝
+                cand["_btc_filter_reject"] = True
+                cand["_btc_reject_reason"] = f"btc_api_error:{type(e).__name__}"
+                return None
     elif cand["type"] in ("oi_surge", "funding_flip_neg", "funding_flip_pos"):
         # OI异动和费率翻转: 不需要费率历史验证(quick_scan已确认)
         # 但在deep_check中校验OI是否仍然有效(对于oi_surge)
         if cand["type"] == "oi_surge":
+            if OI_SURGE_LONG_ONLY and cand.get("direction") != "long":
+                return None
             # 再查一次OI确认信号强度
             try:
                 oi_hist = get_oi_history(sym, "1h", 2)
@@ -992,7 +1029,7 @@ def deep_check(cand):
                         oi_chg = (curr_oi - prev_oi) / prev_oi * 100
                         if oi_chg < OI_SURGE_PCT:
                             cand["strength"] = "B"
-                            cand["reason"] += " | OI续涨{oi_chg:+.1f}%"
+                            cand["reason"] += f" | OI续涨{oi_chg:+.1f}%"
                         else:
                             cand["strength"] = "A" if oi_chg >= 10 else cand["strength"]
             except Exception:
@@ -1754,13 +1791,22 @@ def main():
             continue
         verified = deep_check(cand)
         if not verified:
+            # 区分 BTC filter 拒绝 vs 普通 deep_check 失败
+            if cand.get("_btc_filter_reject"):
+                reject_reason = f"btc_filter:{cand.get('_btc_reject_reason','unknown')}"
+                log(f"  [{cand['symbol']}] BTC filter 拒绝 spike long ({cand.get('_btc_reject_reason','')})")
+            else:
+                reject_reason = "deep_check验证失败"
             log_scan_decision({
                 "symbol": cand["symbol"],
                 "direction": cand.get("direction", "unknown"),
                 "status": "rejected",
-                "reason": "deep_check验证失败",
+                "reason": reject_reason,
                 "signal_type": cand.get("type", ""),
                 "strength": cand.get("strength", ""),
+                "btc_ema_fast": cand.get("_btc_ema_fast"),
+                "btc_ema_slow": cand.get("_btc_ema_slow"),
+                "btc_trend": cand.get("_btc_trend"),
             })
             continue
         # v3: 移除B级信号封杀 — 交给信号质量评分系统自然过滤
@@ -2235,6 +2281,16 @@ def main():
         log(f"开仓 #{trade['id']} {verified['symbol']} {d_cn} @ {trade['entry_price']} RR={rr:.1f} Profile={STRATEGY_PROFILE}({profile_desc})")
         break
     
+    # shadow outcome 更新：每次扫描检查虚拟持仓是否触发 SL/TP/超时
+    if SPIKE_LONG_BTC_EMA_FILTER:
+        try:
+            from btc_filter_shadow import update_shadow_outcomes
+            n_closed = update_shadow_outcomes()
+            if n_closed:
+                log(f"[shadow] 本轮关闭 {n_closed} 个虚拟持仓")
+        except Exception as e:
+            log(f"[shadow] update error: {e}")
+
     # 输出状态摘要
     closed = [t for t in data["trades"] if t["status"] == "closed"]
     total_pnl = sum(t.get("pnl_usd") or 0 for t in closed)

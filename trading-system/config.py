@@ -133,6 +133,15 @@ EXTREME_NEG_FUNDING = -0.08
 EXTREME_POS_FUNDING = 0.10
 OI_SURGE_PCT = 5.0
 MIN_OI_USD = 2_000_000
+OI_SURGE_LONG_ONLY = get_config("OI_SURGE_LONG_ONLY", "false").lower() == "true"
+
+# 可选：只允许指定信号类型进入开仓候选池，逗号分隔。
+# 例: ENABLE_ONLY_SIGNAL_TYPES=oi_surge
+_ENABLE_ONLY_SIGNAL_TYPES_RAW = get_config("ENABLE_ONLY_SIGNAL_TYPES", "").strip()
+ENABLE_ONLY_SIGNAL_TYPES = (
+    {x.strip() for x in _ENABLE_ONLY_SIGNAL_TYPES_RAW.split(",") if x.strip()}
+    if _ENABLE_ONLY_SIGNAL_TYPES_RAW else None
+)
 
 # === 趋势确认 ===
 EMA_FAST = 9
@@ -160,6 +169,11 @@ V8_SIGNAL_WEIGHTS = {
 
 V8_SIGNAL_QUALITY_MIN = 55
 V8_RR_MIN = 1.3
+
+# closed_15m_spike long BTC EMA趋势硬过滤
+# 当BTC 4h EMA9 < EMA21*(1-band)时拒绝spike long，避免熊市/震荡市做多
+SPIKE_LONG_BTC_EMA_FILTER = get_config("SPIKE_LONG_BTC_EMA_FILTER", "false").lower() == "true"
+SPIKE_LONG_BTC_EMA_BAND = float(get_config("SPIKE_LONG_BTC_EMA_BAND", "0.005"))
 
 V8_KELLY_FRACTION = 0.25
 V8_DEFAULT_WIN_RATE = 0.55
@@ -244,6 +258,24 @@ STRATEGY_PROFILES = {
         "V11I_CONSEC_LOSS_MULT": 0.7,
         "V11I_MAX_SL_PCT": 10.0,
         "desc": "保守风控挡",
+    },
+
+    # M40_OI_CORE_LONG: 从 M40 实盘复盘中提取的最优核心策略
+    # 逻辑: 只做 oi_surge long，禁用 spike/funding/OI short；过滤历史拖累币。
+    # 2026-06-04 可用 OI 真数据验证(约20.8天): OI long+blacklist +166.65U / PF1.92。
+    # 注意: Binance 公共 OI 历史限制，长周期需继续用 live/shadow 数据验收。
+    "M40_OI_CORE_LONG": {
+        "MAX_LOSS_PER_TRADE": 40.0,
+        "V11I_CONSEC_LOSS_MULT": 0.5,
+        "V11I_MAX_SL_PCT": 8.0,
+        "V8_SIGNAL_QUALITY_MIN": 65,
+        "MTF_AGREE_MIN": 3,
+        "OI_SURGE_PCT": 7.5,
+        "MIN_OI_USD": 2_000_000,
+        "OI_SURGE_LONG_ONLY": True,
+        "ENABLE_ONLY_SIGNAL_TYPES": ["oi_surge"],
+        "EXTRA_BLACKLIST": ["SKYAIUSDT", "BUSDT", "VVVUSDT", "INTCUSDT", "TONUSDT"],
+        "desc": "M40实盘提取: OI异动只做多核心策略",
     },
 
     # D60: 对照组
@@ -341,6 +373,55 @@ STRATEGY_PROFILES = {
         "V11I_MAX_SL_PCT": 7.0,
         "desc": "研究基准(SL≤7%)",
     },
+
+    # M40_SF: M40 + closed_15m_spike long BTC EMA硬过滤
+    # 适合: 当前市场(震荡/偏空)，减少spike long假信号
+    # 修复: 最近4天 closed_15m_spike long 胜率38.5%问题
+    # 预期: 过滤约30-40%的spike long信号，减少亏损同时保留oi_surge/funding信号
+    "M40_SF": {
+        "MAX_LOSS_PER_TRADE": 40.0,
+        "V11I_CONSEC_LOSS_MULT": 0.7,
+        "V11I_MAX_SL_PCT": 10.0,
+        "SPIKE_LONG_BTC_EMA_FILTER": True,
+        "SPIKE_LONG_BTC_EMA_BAND": 0.005,
+        "desc": "M40+Spike BTC过滤(当前修复档)",
+    },
+
+    # G60B_SF: G60B + closed_15m_spike long BTC EMA硬过滤
+    # band=0.005: 旧版本，已被 G60B_SF0 取代
+    "G60B_SF": {
+        "MAX_LOSS_PER_TRADE": 60.0,
+        "V11I_CONSEC_LOSS_MULT": 0.5,
+        "V11I_MAX_SL_PCT": 7.0,
+        "V11I_MAX_ATR_PCT": 4.5,
+        "V8_SIGNAL_QUALITY_MIN": 85,
+        "MTF_AGREE_MIN": 4,
+        "SPIKE_LONG_BTC_EMA_FILTER": True,
+        "SPIKE_LONG_BTC_EMA_BAND": 0.005,
+        "EXTRA_BLACKLIST": ["ADAUSDT", "LDOUSDT", "SKYAIUSDT", "SNDKUSDT", "SUIUSDT", "TONUSDT", "VVVUSDT", "XRPUSDT"],
+        "desc": "G60B+Spike BTC过滤 band=0.005(旧版)",
+    },
+
+    # G60B_SF0: G60B + BTC EMA严格过滤 band=0
+    # 规则: BTC EMA9(4h) < EMA21(4h) 时拒绝所有 spike long
+    # 回测验证(2025-05~2026-05, quality≥85口径):
+    #   G60B:    +19.76U  DD 10.91%  ROI/DD 0.34
+    #   band=0: +168.15U  DD 5.60%   ROI/DD 3.00
+    # 月度胜率: 12/13 优于 G60B，仅 2025-06 差 7U
+    # 被过滤交易: 81笔 WR=35% PnL=-244U（过滤方向完全正确）
+    # 2026今年独立验证(两份独立分析均得到 ~+102U vs G60B ~+67U)
+    "G60B_SF0": {
+        "MAX_LOSS_PER_TRADE": 60.0,
+        "V11I_CONSEC_LOSS_MULT": 0.5,
+        "V11I_MAX_SL_PCT": 7.0,
+        "V11I_MAX_ATR_PCT": 4.5,
+        "V8_SIGNAL_QUALITY_MIN": 85,
+        "MTF_AGREE_MIN": 4,
+        "SPIKE_LONG_BTC_EMA_FILTER": True,
+        "SPIKE_LONG_BTC_EMA_BAND": 0.0,
+        "EXTRA_BLACKLIST": ["ADAUSDT", "LDOUSDT", "SKYAIUSDT", "SNDKUSDT", "SUIUSDT", "TONUSDT", "VVVUSDT", "XRPUSDT"],
+        "desc": "G60B+Spike BTC严格过滤 band=0(推荐档)",
+    },
 }
 
 # 当前激活的 Profile (通过环境变量覆盖)
@@ -363,6 +444,18 @@ if STRATEGY_PROFILE in STRATEGY_PROFILES:
     BLACKLIST_SHORT_V8_SCORE_THRESHOLD = profile_config.get("BLACKLIST_SHORT_V8_SCORE_THRESHOLD", BLACKLIST_SHORT_V8_SCORE_THRESHOLD)
     BLACKLIST_SHORT_POSITION_FACTOR = profile_config.get("BLACKLIST_SHORT_POSITION_FACTOR", BLACKLIST_SHORT_POSITION_FACTOR)
     V8_POSITION_PCT_MAX = profile_config.get("V8_POSITION_PCT_MAX", V8_POSITION_PCT_MAX)
+    if "SPIKE_LONG_BTC_EMA_FILTER" in profile_config:
+        SPIKE_LONG_BTC_EMA_FILTER = bool(profile_config["SPIKE_LONG_BTC_EMA_FILTER"])
+    if "SPIKE_LONG_BTC_EMA_BAND" in profile_config:
+        SPIKE_LONG_BTC_EMA_BAND = float(profile_config["SPIKE_LONG_BTC_EMA_BAND"])
+    if "OI_SURGE_PCT" in profile_config:
+        OI_SURGE_PCT = float(profile_config["OI_SURGE_PCT"])
+    if "MIN_OI_USD" in profile_config:
+        MIN_OI_USD = float(profile_config["MIN_OI_USD"])
+    if "OI_SURGE_LONG_ONLY" in profile_config:
+        OI_SURGE_LONG_ONLY = bool(profile_config["OI_SURGE_LONG_ONLY"])
+    if "ENABLE_ONLY_SIGNAL_TYPES" in profile_config:
+        ENABLE_ONLY_SIGNAL_TYPES = set(profile_config["ENABLE_ONLY_SIGNAL_TYPES"])
     PROFILE_EXTRA_BLACKLIST = profile_config.get("EXTRA_BLACKLIST", [])
 else:
     # 默认使用 M40
