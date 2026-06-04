@@ -10,6 +10,7 @@
 import sys
 import json
 import os
+import shutil
 import time
 from collections import defaultdict
 
@@ -213,6 +214,42 @@ def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+
+def backup_json_file(path, reason: str) -> Path | None:
+    """Create a timestamped backup before automatic cleanup rewrites."""
+    if not path.exists():
+        return None
+    stamp = datetime.now(TZ_UTC8).strftime("%Y%m%d-%H%M%S")
+    backup_path = path.with_name(f"{path.stem}.{reason}.{stamp}{path.suffix}")
+    shutil.copy2(path, backup_path)
+    return backup_path
+
+
+def clean_historical_fake_sync_pnl(data: dict) -> int:
+    """Zero out historical sync-close PnL that has no real fill evidence."""
+    changed = 0
+    for trade in data.get("trades", []):
+        if trade.get("status") != "closed":
+            continue
+        if "同步平仓(交易所无持仓)" not in str(trade.get("exit_reason", "")):
+            continue
+
+        quantity = trade.get("quantity")
+        missing_real_fill = quantity in (None, 0, 0.0, "0", "0.0", "") or not trade.get("binance_order_id")
+        if not missing_real_fill:
+            continue
+
+        pnl_usd = trade.get("pnl_usd") or 0
+        pnl_pct = trade.get("pnl_pct") or 0
+        if pnl_usd == 0 and pnl_pct == 0 and trade.get("pnl_source"):
+            continue
+
+        trade["pnl_usd"] = 0
+        trade["pnl_pct"] = 0
+        trade["pnl_source"] = "daily_review_exchange_sync_zero_fill"
+        changed += 1
+    return changed
+
 def get_local_balance(data):
     """本地记账余额"""
     balance = data.get("initial_balance", INITIAL_BALANCE)
@@ -389,6 +426,17 @@ def handle_protective_stop_failure(trade: dict, stop_result: dict) -> bool:
         log(f"🚨 保护止损失败且自动平仓失败 {trade['symbol']}: {close_result}")
 
     return False
+
+
+def mark_software_stop_only(trade: dict, reason: str) -> dict:
+    """Record that stop protection is enforced by the local monitor loop."""
+    trade["software_stop_only"] = True
+    trade["stop_protection_mode"] = "software"
+    trade["stop_order_id"] = None
+    trade["stop_algo_id"] = None
+    trade["stop_order_error"] = reason
+    trade["stop_order_error_time"] = now_str()
+    return trade
 
 
 # ═══════════════════════════════════════════
@@ -1366,15 +1414,72 @@ def check_trailing_stop(trade, price):
     return None
 
 
-def check_time_stop(trade, now):
-    """时间止损 (v3: 已禁用，返回None)"""
-    # v3: 移除MAX_HOLD和TIME_DECAY — 回测证明无效果
-    return None, None
+def leveraged_pnl_pct(trade, price):
+    """Return leveraged floating PnL percent for a trade at the current price."""
+    entry = trade["entry_price"]
+    lev = trade.get("leverage", LEVERAGE)
+    if trade["direction"] == "long":
+        return (price - entry) / entry * 100 * lev
+    return (entry - price) / entry * 100 * lev
+
+
+def tighten_time_protection(trade, pnl_pct):
+    """Move software stop close to breakeven for strong aged winners."""
+    entry = trade["entry_price"]
+    protect = TIME_BREAKEVEN_PROTECT_PCT / 100 / max(trade.get("leverage", LEVERAGE), 1)
+    old_sl = trade.get("stop_loss")
+    if trade["direction"] == "long":
+        new_sl = entry * (1 + protect)
+        if old_sl is None or new_sl > old_sl:
+            trade["stop_loss"] = round(new_sl, 10)
+            return f"时间复检强势浮盈{pnl_pct:.1f}%，软件止损抬至保本+{TIME_BREAKEVEN_PROTECT_PCT:.1f}%"
+    else:
+        new_sl = entry * (1 - protect)
+        if old_sl is None or new_sl < old_sl:
+            trade["stop_loss"] = round(new_sl, 10)
+            return f"时间复检强势浮盈{pnl_pct:.1f}%，软件止损压至保本+{TIME_BREAKEVEN_PROTECT_PCT:.1f}%"
+    return None
+
+
+def check_time_stop(trade, now, price):
+    """持仓时长管理: 8h复检弱仓，12h只留强势仓，24h强制释放。"""
+    try:
+        entry_dt = datetime.fromisoformat(trade["entry_time"])
+        if entry_dt.tzinfo is None:
+            entry_dt = entry_dt.replace(tzinfo=TZ_UTC8)
+    except Exception:
+        return None
+
+    hold_hours = (now - entry_dt).total_seconds() / 3600
+    pnl_pct = leveraged_pnl_pct(trade, price)
+    trade["hold_hours"] = round(hold_hours, 3)
+
+    if hold_hours >= TIME_FORCE_EXIT_HOURS:
+        return f"持仓超时{hold_hours:.1f}h>=24h强制释放"
+
+    if hold_hours >= TIME_STRONG_ONLY_HOURS and pnl_pct < TIME_STRONG_PROFIT_PCT:
+        return f"持仓{hold_hours:.1f}h>=12h且浮盈{pnl_pct:.1f}%<{TIME_STRONG_PROFIT_PCT:.1f}%释放仓位"
+
+    if hold_hours >= TIME_REVIEW_HOURS:
+        if pnl_pct <= 0:
+            return f"持仓{hold_hours:.1f}h>=8h仍浮亏{pnl_pct:.1f}%退出"
+        if pnl_pct < TIME_STRONG_PROFIT_PCT:
+            return f"持仓{hold_hours:.1f}h>=8h弱浮盈{pnl_pct:.1f}%<{TIME_STRONG_PROFIT_PCT:.1f}%退出"
+        protection_msg = tighten_time_protection(trade, pnl_pct)
+        if protection_msg:
+            log(f"  #{trade['id']} {trade['symbol']} {protection_msg}")
+
+    return None
 
 
 # === 主流程 ===
 def main():
     data = load_json(TRADES_FILE, {"initial_balance": INITIAL_BALANCE, "trades": []})
+    cleaned_fake_sync = clean_historical_fake_sync_pnl(data)
+    if cleaned_fake_sync:
+        backup_path = backup_json_file(TRADES_FILE, "daily-review-cleanup")
+        save_json(TRADES_FILE, data)
+        log(f"🧹 已清洗 {cleaned_fake_sync} 笔历史同步平仓假PnL，备份={backup_path}")
     state = load_json(STATE_FILE, {"last_opens": {}, "signals_seen": {}})
     
     open_positions = [t for t in data["trades"] if t["status"] == "open"]
@@ -1388,6 +1493,7 @@ def main():
     else:
         log(f"币安余额: 可用${avail_bal:.2f} 总${total_bal:.2f}")
         api_ok = True
+    runtime_balance = total_bal if api_ok and total_bal is not None else get_local_balance(data)
 
     # ═══ 实盘硬锁 ═══
     # 非testnet环境必须同时满足两个条件才能真实下单:
@@ -1400,6 +1506,7 @@ def main():
             log("  1. ENABLE_LIVE_TRADING=true")
             log("  2. LIVE_CONFIRM=I_UNDERSTAND_MAINNET_RISK")
             api_ok = False
+            runtime_balance = get_local_balance(data)
     
     # === P0-1: 持仓同步 ===
     # 如果API连通，用交易所实际持仓校准trades.json
@@ -1415,22 +1522,18 @@ def main():
             
             for trade in list(open_positions):
                 if trade["symbol"] not in real_symbols:
-                    # 交易所有平仓但本地不知道 → 同步平仓
+                    # 交易所有平仓但本地不知道 → 同步关闭本地状态。
+                    # 不能用当前行情价虚构 PnL；真实收益只能来自交易所成交/账户数据。
                     entry = trade["entry_price"]
                     cur_price = get_price(trade["symbol"])
-                    lev = trade.get("leverage", LEVERAGE)
-                    pos_usd = trade.get("position_usd", 0)
-                    if trade["direction"] == "long":
-                        pnl_pct = (cur_price - entry) / entry * 100 * lev if entry and cur_price else 0
-                    else:
-                        pnl_pct = (entry - cur_price) / entry * 100 * lev if entry and cur_price else 0
                     trade["exit_price"] = cur_price or entry
                     trade["exit_time"] = now_str()
                     trade["exit_reason"] = "同步平仓(交易所无持仓)"
-                    trade["pnl_pct"] = round(pnl_pct, 2)
-                    trade["pnl_usd"] = round(pnl_pct / 100 * pos_usd, 4)
+                    trade["pnl_pct"] = 0
+                    trade["pnl_usd"] = 0
+                    trade["pnl_source"] = "exchange_position_sync_no_open_position"
                     trade["status"] = "closed"
-                    log(f"⚠️ #{trade['id']} {trade['symbol']} 同步平仓(交易所无持仓) PnL={trade['pnl_usd']:+.2f}U")
+                    log(f"⚠️ #{trade['id']} {trade['symbol']} 同步平仓(交易所无持仓) PnL按0记录，避免本地虚构收益")
                     notify(f"🔄 同步平仓 #{trade['id']} {trade['symbol']} — 交易所已无持仓")
                     try:
                         sync_trade(trade)
@@ -1493,7 +1596,11 @@ def main():
             if trail_result:
                 triggered = trail_result
 
-        # v3: 移除时间止损(MAX_HOLD/TIME_DECAY) — 无回测支撑，强制平仓反而干扰
+        # 持仓时长管理: 8h复检弱仓，12h只留强势仓，24h强制释放。
+        if not triggered:
+            time_result = check_time_stop(trade, now, price)
+            if time_result:
+                triggered = time_result
 
         if triggered:
             entry = trade["entry_price"]
@@ -1525,6 +1632,12 @@ def main():
             elif trade.get("_simulated"):
                 # 模拟仓位直接关闭
                 close_success = True
+            else:
+                trade["close_error"] = "api_unavailable_or_missing_quantity"
+                trade["close_error_time"] = now_str()
+                trade["pending_exit_reason"] = triggered
+                log(f"⚠️ #{trade['id']} {trade['symbol']} 触发{triggered}，但API不可用或缺少quantity，暂未真实平仓")
+                notify(f"⚠️ 平仓待执行 #{trade['id']} {trade['symbol']} — {triggered}；API不可用或缺少quantity")
 
             # 只有平仓成功才标记为closed
             if close_success:
@@ -1620,7 +1733,7 @@ def main():
     
     if not candidates:
         log("无信号")
-        print(f"📊 持仓{len(open_positions)}/{MAX_OPEN_POSITIONS} | 无新信号 | 余额${get_local_balance(data):.2f}")
+        print(f"📊 持仓{len(open_positions)}/{MAX_OPEN_POSITIONS} | 无新信号 | 余额${runtime_balance:.2f}")
         return
     
     # 按费率极端程度排序
@@ -1787,7 +1900,7 @@ def main():
                 pass
             
             # v8 Kelly动态仓位
-            balance = get_local_balance(data)
+            balance = runtime_balance
             pos_usd = v8_kelly_position(balance, V8_DEFAULT_WIN_RATE, rr, signal_quality, macro_normalized)
             log(f"  v8 Kelly仓位: ${pos_usd:.2f} ({pos_usd/balance*100:.1f}%)")
             
@@ -1957,7 +2070,7 @@ def main():
                 continue
             
             # 开仓参数
-            balance = get_local_balance(data)
+            balance = runtime_balance
             pos_usd = round(balance * POSITION_PCT / 100, 4)
         price = verified["price"]
         
@@ -2024,32 +2137,57 @@ def main():
                 else:
                     trade["stop_loss"] = round(trade["entry_price"] * (1 + sl_pct), price_precision)
                     trade["take_profit"] = round(trade["entry_price"] * (1 - tp_pct), price_precision)
-                stop_result = place_stop_loss_order(
-                    verified["symbol"],
-                    trade["quantity"],
-                    verified["direction"],
-                    trade["stop_loss"],
-                )
-                if isinstance(stop_result, dict) and "error" in stop_result:
-                    notify(f"⚠️ 止损单挂单失败 {verified['symbol']}: {stop_result}")
-                    log(f"⚠️ STOP_MARKET止损单失败: {stop_result}")
-                    handle_protective_stop_failure(trade, stop_result)
-                else:
-                    if isinstance(stop_result, dict):
-                        trade["stop_order_id"] = stop_result.get("orderId") or stop_result.get("algoId")
-                        trade["stop_algo_id"] = stop_result.get("algoId")
+                if EXCHANGE_STOP_ENABLED:
+                    stop_result = place_stop_loss_order(
+                        verified["symbol"],
+                        trade["quantity"],
+                        verified["direction"],
+                        trade["stop_loss"],
+                    )
+                    if isinstance(stop_result, dict) and "error" in stop_result:
+                        notify(f"⚠️ 止损单挂单失败 {verified['symbol']}: {stop_result}")
+                        log(f"⚠️ STOP_MARKET止损单失败: {stop_result}")
+                        handle_protective_stop_failure(trade, stop_result)
                     else:
-                        trade["stop_order_id"] = None
-                    log(f"✅ STOP_MARKET止损单已挂 id={trade.get('stop_order_id')}")
+                        if isinstance(stop_result, dict):
+                            trade["stop_order_id"] = stop_result.get("orderId") or stop_result.get("algoId")
+                            trade["stop_algo_id"] = stop_result.get("algoId")
+                        else:
+                            trade["stop_order_id"] = None
+                        log(f"✅ STOP_MARKET止损单已挂 id={trade.get('stop_order_id')}")
+                else:
+                    mark_software_stop_only(trade, "exchange_stop_disabled")
+                    log(f"🧭 软件止损模式 {verified['symbol']} SL={trade['stop_loss']} TP={trade['take_profit']}")
                 log(f"✅ 真实下单成功 orderId={trade['binance_order_id']}")
             else:
                 notify(f"⚠️ 真实下单失败 {verified['symbol']}: {open_result['error']}")
                 log(f"❌ 真实下单失败: {open_result['error']}")
-                trade["quantity"] = 0
-                trade["_simulated"] = True
+                log_scan_decision({
+                    "symbol": verified["symbol"],
+                    "direction": verified["direction"],
+                    "status": "rejected",
+                    "reason": f"真实下单失败: {open_result['error']}",
+                    "v8_score": int(weighted_score) if V8_ENABLED else 0,
+                    "signal_quality": signal_quality if V8_ENABLED else 0,
+                    "signal_type": verified.get("type", ""),
+                    "strength": verified.get("strength", ""),
+                    "strategy_profile": STRATEGY_PROFILE,
+                })
+                continue
         else:
-            trade["_simulated"] = True
-            log(f"API未连通，仅模拟开仓")
+            log(f"API未连通，跳过真实开仓")
+            log_scan_decision({
+                "symbol": verified["symbol"],
+                "direction": verified["direction"],
+                "status": "rejected",
+                "reason": "API未连通，跳过真实开仓",
+                "v8_score": int(weighted_score) if V8_ENABLED else 0,
+                "signal_quality": signal_quality if V8_ENABLED else 0,
+                "signal_type": verified.get("type", ""),
+                "strength": verified.get("strength", ""),
+                "strategy_profile": STRATEGY_PROFILE,
+            })
+            continue
 
         # 记录接受的决策
         log_scan_decision({
@@ -2099,11 +2237,13 @@ def main():
     
     # 输出状态摘要
     closed = [t for t in data["trades"] if t["status"] == "closed"]
-    total_pnl = sum(t.get("pnl_usd", 0) for t in closed)
+    total_pnl = sum(t.get("pnl_usd") or 0 for t in closed)
     wins = sum(1 for t in closed if (t.get("pnl_usd", 0) or 0) > 0)
     sim_tag = " (模拟)" if not api_ok else ""
     wr = f"{wins/len(closed)*100:.0f}%" if closed else "N/A"
-    print(f"📊 余额${get_local_balance(data):.2f}{sim_tag} | 持仓{len(open_positions)+1} | 已平{len(closed)}W{wins}L{len(closed)-wins} | 胜率{wr} | 总{total_pnl:+.2f}U")
+    current_open = len([t for t in data["trades"] if t["status"] == "open"])
+    display_pnl = runtime_balance - data.get("initial_balance", INITIAL_BALANCE) if api_ok else total_pnl
+    print(f"📊 余额${runtime_balance:.2f}{sim_tag} | 持仓{current_open} | 已平{len(closed)}W{wins}L{len(closed)-wins} | 胜率{wr} | 总{display_pnl:+.2f}U")
 
 
 if __name__ == "__main__":

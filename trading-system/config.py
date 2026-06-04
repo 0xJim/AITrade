@@ -50,8 +50,8 @@ def get_config(name: str, default: str = "") -> str:
     return os.environ.get(name, BINANCE_CONFIG.get(name, default))
 
 
-BINANCE_API_KEY = get_config("BINANCE_API_KEY")
-BINANCE_API_SECRET = get_config("BINANCE_API_SECRET")
+BINANCE_API_KEY = get_config("BINANCE_API_KEY") or get_config("BINANCE_TESTNET_API_KEY")
+BINANCE_API_SECRET = get_config("BINANCE_API_SECRET") or get_config("BINANCE_TESTNET_API_SECRET")
 BINANCE_TESTNET = get_config("BINANCE_TESTNET", "true").lower() == "true"
 
 # Binance endpoints are intentionally split:
@@ -97,10 +97,22 @@ TRAILING_TP_ENABLED = True
 TRAILING_TP_TRIGGER = 0.05     # 盈利5%后启动
 TRAILING_TP_STEP = 0.025       # 回撤2.5%即平仓
 
+# === 持仓时长管理 ===
+# 复盘口径: 4-24h 仍有正收益，24h 后明显恶化；因此 8h 开始复检，
+# 12h 后只保留强势盈利仓，24h 强制释放仓位。
+TIME_REVIEW_HOURS = float(get_config("TIME_REVIEW_HOURS", "8"))
+TIME_STRONG_ONLY_HOURS = float(get_config("TIME_STRONG_ONLY_HOURS", "12"))
+TIME_FORCE_EXIT_HOURS = float(get_config("TIME_FORCE_EXIT_HOURS", "24"))
+TIME_STRONG_PROFIT_PCT = float(get_config("TIME_STRONG_PROFIT_PCT", "8"))  # 杠杆后浮盈%
+TIME_BREAKEVEN_PROTECT_PCT = float(get_config("TIME_BREAKEVEN_PROTECT_PCT", "0.3"))
+
 # === 时间 ===
 GRACE_PERIOD_HOURS = 4         # 入场后4h宽限期，不扫止损
 # 当真实下单并挂交易所止损时，本地不应用宽限期（优先安全）
 EXCHANGE_STOP_IMMEDIATE = True  # True=有交易所止损单则不使用宽限期，False=保留宽限期
+# Binance Futures Testnet conditional stop endpoints are not reliable enough for
+# the current testnet run. Default to software stops unless explicitly enabled.
+EXCHANGE_STOP_ENABLED = get_config("EXCHANGE_STOP_ENABLED", "false").lower() == "true"
 
 # === 扫描间隔 ===
 SCAN_INTERVAL = 60

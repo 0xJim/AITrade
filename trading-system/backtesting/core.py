@@ -96,19 +96,23 @@ class BinanceFuturesDataProvider:
 
     def _get(self, endpoint: str, params: dict[str, Any] | None = None) -> Any:
         url = f"{self.base_url}{endpoint}"
-        try:
-            resp = requests.get(url, params=params or {}, timeout=20)
-            if resp.status_code == 429:
-                time.sleep(2)
+        last_error: RequestException | None = None
+        for attempt in range(5):
+            try:
                 resp = requests.get(url, params=params or {}, timeout=20)
-            resp.raise_for_status()
-            return resp.json()
-        except RequestException as exc:
-            raise RuntimeError(
-                f"Binance public data request failed: {url}; "
-                f"check network/proxy/firewall or set BINANCE_DATA_FAPI. "
-                f"Original error: {exc}"
-            ) from exc
+                if resp.status_code == 429:
+                    time.sleep(2 + attempt)
+                    continue
+                resp.raise_for_status()
+                return resp.json()
+            except RequestException as exc:
+                last_error = exc
+                time.sleep(1.5 * (attempt + 1))
+        raise RuntimeError(
+            f"Binance public data request failed: {url}; "
+            f"check network/proxy/firewall or set BINANCE_DATA_FAPI. "
+            f"Original error: {last_error}"
+        )
 
     def list_symbols(self, limit: int, min_quote_volume: float, exclude: set[str]) -> list[str]:
         data = self._get("/fapi/v1/ticker/24hr")
