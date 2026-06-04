@@ -88,6 +88,21 @@ LEVERAGE = 3                   # 杠杆
 COOLDOWN_HOURS = 4             # 同一币种冷却时间
 MIN_VOLUME_M = 50              # 最小24h成交额百万U
 
+# === 2026-06-04 防守模式开关 ===
+# 复盘显示 closed_15m_spike long 近期胜率/收益显著恶化，默认先暂停实盘开仓；
+# 仍可通过 scan_decisions 观察被过滤信号，后续样本恢复后再打开。
+DISABLE_CLOSED_15M_SPIKE_LONG = get_config("DISABLE_CLOSED_15M_SPIKE_LONG", "true").lower() == "true"
+
+# 候选级 24h 成交额硬过滤。get_qualified_symbols 已使用 MIN_VOLUME_M 过滤，
+# 这里保留独立开关，避免未来改动扫描池时低流动性币种绕过风控。
+MIN_CANDIDATE_QUOTE_VOLUME_USD = float(
+    get_config("MIN_CANDIDATE_QUOTE_VOLUME_USD", str(MIN_VOLUME_M * 1_000_000))
+)
+
+# 保护止损失败属于执行层严重问题：立即平仓后，先冷却该币种，避免反复开仓/平仓消耗手续费。
+STOP_FAIL_COOLDOWN_HOURS = int(get_config("STOP_FAIL_COOLDOWN_HOURS", "24"))
+STOP_FAIL_BLACKLIST_THRESHOLD_24H = int(get_config("STOP_FAIL_BLACKLIST_THRESHOLD_24H", "2"))
+
 # === 止损止盈 ===
 DEFAULT_SL_PCT = 0.05          # 兜底止损5%
 DEFAULT_TP_PCT = 0.10          # 兜底止盈10%

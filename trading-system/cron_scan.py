@@ -75,7 +75,7 @@ def update_dynamic_blacklist(data):
         from config import (BLACKLIST_LOOKBACK_DAYS, BLACKLIST_MIN_TRADES,
                           BLACKLIST_MAX_LOSS_USD, BLACKLIST_MAX_WIN_RATE,
                           BLACKLIST_SINGLE_LOSS_USD, BLACKLIST_QUARANTINE_HOURS,
-                          BLACKLIST_FILE)
+                          BLACKLIST_FILE, STOP_FAIL_BLACKLIST_THRESHOLD_24H)
     except ImportError:
         return set()
     
@@ -94,7 +94,8 @@ def update_dynamic_blacklist(data):
         except Exception:
             continue
     
-    by_sym = defaultdict(lambda: {"n": 0, "wins": 0, "pnl": 0, "worst": 0})
+    stop_fail_cutoff = now - timedelta(hours=24)
+    by_sym = defaultdict(lambda: {"n": 0, "wins": 0, "pnl": 0, "worst": 0, "stop_fail_24h": 0})
     for t in recent:
         sym = t["symbol"]
         pnl = t.get("pnl_usd", 0) or 0
@@ -103,6 +104,15 @@ def update_dynamic_blacklist(data):
             by_sym[sym]["wins"] += 1
         by_sym[sym]["pnl"] += pnl
         by_sym[sym]["worst"] = min(by_sym[sym]["worst"], pnl)
+        if t.get("exit_reason") == "protective_stop_failed":
+            try:
+                exit_dt = datetime.fromisoformat(t["exit_time"])
+                if exit_dt.tzinfo is None:
+                    exit_dt = exit_dt.replace(tzinfo=TZ_UTC8)
+                if exit_dt >= stop_fail_cutoff:
+                    by_sym[sym]["stop_fail_24h"] += 1
+            except Exception:
+                pass
     
     quarantine = {}
     for sym, stats in by_sym.items():
@@ -113,19 +123,24 @@ def update_dynamic_blacklist(data):
             and win_rate <= BLACKLIST_MAX_WIN_RATE
         )
         single_large_loss = stats["worst"] <= -BLACKLIST_SINGLE_LOSS_USD
-        if repeated_losses or single_large_loss:
+        repeated_stop_fail = stats["stop_fail_24h"] >= STOP_FAIL_BLACKLIST_THRESHOLD_24H
+        if repeated_losses or single_large_loss or repeated_stop_fail:
             until = now + timedelta(hours=BLACKLIST_QUARANTINE_HOURS)
-            reason = (
-                f"近{BLACKLIST_LOOKBACK_DAYS}天{stats['n']}笔,"
-                f"胜{win_rate*100:.0f}%,净PnL ${stats['pnl']:.2f},"
-                f"最大单亏 ${stats['worst']:.2f}"
-            )
+            if repeated_stop_fail:
+                reason = f"24h内保护止损失败{stats['stop_fail_24h']}次，执行层隔离"
+            else:
+                reason = (
+                    f"近{BLACKLIST_LOOKBACK_DAYS}天{stats['n']}笔,"
+                    f"胜{win_rate*100:.0f}%,净PnL ${stats['pnl']:.2f},"
+                    f"最大单亏 ${stats['worst']:.2f}"
+                )
             quarantine[sym] = {
                 "reason": reason,
                 "n": stats["n"],
                 "win_rate": round(win_rate, 4),
                 "pnl": round(stats["pnl"], 4),
                 "worst_loss": round(stats["worst"], 4),
+                "stop_fail_24h": stats["stop_fail_24h"],
                 "quarantined_at": now.isoformat(),
                 "quarantined_until": until.isoformat(),
             }
@@ -152,6 +167,7 @@ def update_dynamic_blacklist(data):
             "max_loss_usd": BLACKLIST_MAX_LOSS_USD,
             "max_win_rate": BLACKLIST_MAX_WIN_RATE,
             "single_loss_usd": BLACKLIST_SINGLE_LOSS_USD,
+            "stop_fail_threshold_24h": STOP_FAIL_BLACKLIST_THRESHOLD_24H,
             "quarantine_hours": BLACKLIST_QUARANTINE_HOURS,
         },
     }, ensure_ascii=False, indent=2))
@@ -419,6 +435,27 @@ def handle_protective_stop_failure(trade: dict, stop_result: dict) -> bool:
     if close_result.get("success"):
         trade["status"] = "closed"
         trade["binance_close_order_id"] = (close_result.get("order") or {}).get("orderId")
+        exit_price = close_result.get("fill_price") or trade.get("entry_price")
+        trade["exit_price"] = exit_price
+        try:
+            entry = float(trade.get("entry_price") or 0)
+            exit_p = float(exit_price or 0)
+            lev = float(trade.get("leverage") or LEVERAGE)
+            pos_usd = float(trade.get("position_usd") or 0)
+            if entry > 0 and exit_p > 0:
+                raw_pct = (exit_p - entry) / entry * 100
+                if trade.get("direction") == "short":
+                    raw_pct = -raw_pct
+                pnl_pct = raw_pct * lev
+                trade["pnl_pct"] = round(pnl_pct, 4)
+                trade["pnl_usd"] = round(pnl_pct / 100 * pos_usd, 4)
+            else:
+                trade["pnl_pct"] = 0
+                trade["pnl_usd"] = 0
+        except Exception:
+            trade["pnl_pct"] = 0
+            trade["pnl_usd"] = 0
+        trade["pnl_source"] = "protective_stop_failure_emergency_close"
         log(f"🛑 保护止损失败，已立即平仓 {trade['symbol']} closeOrderId={trade.get('binance_close_order_id')}")
     else:
         trade["status"] = "unprotected"
@@ -492,6 +529,45 @@ def build_closed_15m_spike_candidate(sym: str, fr: float, chg: float, vol: float
     }
 
 
+def candidate_passes_defensive_filters(cand: dict) -> tuple[bool, str]:
+    """2026-06-04 defensive filters derived from recent M40 sim review."""
+    if (
+        DISABLE_CLOSED_15M_SPIKE_LONG
+        and cand.get("type") == "closed_15m_spike"
+        and cand.get("direction") == "long"
+    ):
+        return False, "防守模式暂停 closed_15m_spike long"
+
+    try:
+        quote_volume = float(cand.get("vol", 0) or 0)
+    except (TypeError, ValueError):
+        quote_volume = 0
+    if quote_volume < MIN_CANDIDATE_QUOTE_VOLUME_USD:
+        return False, f"24h成交额${quote_volume/1e6:.1f}M<{MIN_CANDIDATE_QUOTE_VOLUME_USD/1e6:.1f}M"
+
+    return True, ""
+
+
+def append_candidate(candidates: list, cand: dict) -> bool:
+    """Append only if defensive filters pass; log rejected candidates for later review."""
+    ok, reason = candidate_passes_defensive_filters(cand)
+    if ok:
+        candidates.append(cand)
+        return True
+
+    log(f"  过滤 {cand.get('symbol')} {cand.get('type')} {cand.get('direction')}: {reason}")
+    log_scan_decision({
+        "symbol": cand.get("symbol", ""),
+        "direction": cand.get("direction", "unknown"),
+        "status": "rejected",
+        "reason": reason,
+        "signal_type": cand.get("type", ""),
+        "strength": cand.get("strength", ""),
+        "strategy_profile": STRATEGY_PROFILE,
+    })
+    return False
+
+
 def quick_scan(open_symbols, cooldowns):
     """
     快速扫描: 优先用15m已收线异动生成候选，再补充极端费率/暴涨暴跌候选。
@@ -527,28 +603,28 @@ def quick_scan(open_symbols, cooldowns):
             try:
                 spike_candidate = build_closed_15m_spike_candidate(sym, fr, chg, vol)
                 if spike_candidate:
-                    candidates.append(spike_candidate)
+                    append_candidate(candidates, spike_candidate)
                     continue
             except Exception:
                 pass
         
         if fr < EXTREME_NEG_FUNDING:
             # v5: 负费率做多需要BTC不暴跌 + RSI超卖确认
-            candidates.append({"symbol": sym, "type": "extreme_neg_funding", "direction": "long",
+            append_candidate(candidates, {"symbol": sym, "type": "extreme_neg_funding", "direction": "long",
                 "strength": "B", "price": price, "fr": fr, "change": chg, "vol": vol,
                 "reason": f"极端负费率{fr:+.4f}%"})
         elif fr > EXTREME_POS_FUNDING:
-            candidates.append({"symbol": sym, "type": "extreme_pos_funding", "direction": "short",
+            append_candidate(candidates, {"symbol": sym, "type": "extreme_pos_funding", "direction": "short",
                 "strength": "B", "price": price, "fr": fr, "change": chg, "vol": vol,
                 "reason": f"极端正费率{fr:+.4f}%"})
         elif chg < -25:
             # v3: 恢复暴跌阈值 -30→-25，与signals.py统一
-            candidates.append({"symbol": sym, "type": "crash_bounce", "direction": "long",
+            append_candidate(candidates, {"symbol": sym, "type": "crash_bounce", "direction": "long",
                 "strength": "B", "price": price, "fr": fr, "change": chg, "vol": vol,
                 "reason": f"24h暴跌{chg:+.1f}%"})
         elif chg > 40:
             # v3: 恢复暴涨阈值 50→40，与signals.py统一
-            candidates.append({"symbol": sym, "type": "pump_short", "direction": "short",
+            append_candidate(candidates, {"symbol": sym, "type": "pump_short", "direction": "short",
                 "strength": "B", "price": price, "fr": fr, "change": chg, "vol": vol,
                 "reason": f"24h暴涨{chg:+.1f}%"})
         else:
@@ -597,7 +673,7 @@ def quick_scan(open_symbols, cooldowns):
                         # OI增加+价格涨=做多, OI+价格跌=做空
                         oi_direction = "long" if chg > 0 else "short"
                         oi_strength = "A" if oi_chg_pct >= 10 else "B"
-                        candidates.append({"symbol": sym, "type": "oi_surge",
+                        append_candidate(candidates, {"symbol": sym, "type": "oi_surge",
                             "direction": oi_direction, "strength": oi_strength,
                             "price": price, "fr": fr, "change": chg, "vol": vol,
                             "reason": f"OI异动{oi_chg_pct:+.1f}% (${curr_oi/1e6:.1f}M) 价格{chg:+.1f}% 大资金进场"})
@@ -612,14 +688,14 @@ def quick_scan(open_symbols, cooldowns):
                 if recent[0] > 0 and recent[1] > 0 and recent[-1] < -0.01:
                     # 正→负: 做多信号
                     flip_strength = "A" if abs(recent[-1]) > 0.05 else "B"
-                    candidates.append({"symbol": sym, "type": "funding_flip_neg",
+                    append_candidate(candidates, {"symbol": sym, "type": "funding_flip_neg",
                         "direction": "long", "strength": flip_strength,
                         "price": price, "fr": fr, "change": chg, "vol": vol,
                         "reason": f"费率翻转: {recent[0]:+.3f}→{recent[1]:+.3f}→{recent[-1]:+.3f} 正转负"})
                 elif recent[0] < 0 and recent[1] < 0 and recent[-1] > 0.01:
                     # 负→正: 做多信号（趋势确认）
                     flip_strength = "A" if recent[-1] > 0.05 else "B"
-                    candidates.append({"symbol": sym, "type": "funding_flip_pos",
+                    append_candidate(candidates, {"symbol": sym, "type": "funding_flip_pos",
                         "direction": "long", "strength": flip_strength,
                         "price": price, "fr": fr, "change": chg, "vol": vol,
                         "reason": f"费率翻转: {recent[0]:+.3f}→{recent[1]:+.3f}→{recent[-1]:+.3f} 负转正"})
@@ -1688,6 +1764,26 @@ def main():
                 pass
     if loss_symbols_24h:
         log(f"🔴 近24h亏损币种({len(loss_symbols_24h)}): {', '.join(list(loss_symbols_24h)[:5])}")
+
+    # === 执行失败冷却: 保护止损失败后避免反复开仓/平仓消耗手续费 ===
+    stop_fail_symbols = set()
+    try:
+        stop_fail_cutoff = now - timedelta(hours=STOP_FAIL_COOLDOWN_HOURS)
+        for t in data["trades"]:
+            if t.get("exit_reason") != "protective_stop_failed" or not t.get("exit_time"):
+                continue
+            try:
+                exit_dt = datetime.fromisoformat(t["exit_time"])
+                if exit_dt.tzinfo is None:
+                    exit_dt = exit_dt.replace(tzinfo=TZ_UTC8)
+                if exit_dt >= stop_fail_cutoff:
+                    stop_fail_symbols.add(t["symbol"])
+            except Exception:
+                pass
+    except Exception:
+        stop_fail_symbols = set()
+    if stop_fail_symbols:
+        log(f"🟠 保护止损失败冷却({len(stop_fail_symbols)}): {', '.join(list(stop_fail_symbols)[:5])}")
     
     # v4: 更新和加载动态黑名单
     blacklist = update_dynamic_blacklist(data)
@@ -1729,6 +1825,19 @@ def main():
     candidates.sort(key=lambda x: abs(x.get("fr", 0)), reverse=True)
     
     for cand in candidates[:15]:  # v3: 放宽检查数量 10→15
+        if cand["symbol"] in stop_fail_symbols:
+            log(f"  {cand['symbol']} 保护止损失败冷却，跳过")
+            log_scan_decision({
+                "symbol": cand["symbol"],
+                "direction": cand.get("direction", "unknown"),
+                "status": "rejected",
+                "reason": f"保护止损失败冷却{STOP_FAIL_COOLDOWN_HOURS}h",
+                "signal_type": cand.get("type", ""),
+                "strength": cand.get("strength", ""),
+                "strategy_profile": STRATEGY_PROFILE,
+            })
+            continue
+
         # P0-2: 跳过近24h亏损币种
         if cand["symbol"] in loss_symbols_24h:
             log(f"  {cand['symbol']} 近24h亏损，跳过")
@@ -2136,6 +2245,26 @@ def main():
                     notify(f"⚠️ 止损单挂单失败 {verified['symbol']}: {stop_result}")
                     log(f"⚠️ STOP_MARKET止损单失败: {stop_result}")
                     handle_protective_stop_failure(trade, stop_result)
+                    data["trades"].append(trade)
+                    state["last_opens"][verified["symbol"]] = now_str()
+                    save_json(TRADES_FILE, data)
+                    save_json(STATE_FILE, state)
+                    try:
+                        sync_trade(trade)
+                    except Exception:
+                        pass
+                    log_scan_decision({
+                        "symbol": verified["symbol"],
+                        "direction": verified["direction"],
+                        "status": "rejected",
+                        "reason": f"保护止损挂单失败，已触发紧急平仓/冷却: {stop_result}",
+                        "v8_score": int(weighted_score) if V8_ENABLED else 0,
+                        "signal_quality": signal_quality if V8_ENABLED else 0,
+                        "signal_type": verified.get("type", ""),
+                        "strength": verified.get("strength", ""),
+                        "strategy_profile": STRATEGY_PROFILE,
+                    })
+                    continue
                 else:
                     if isinstance(stop_result, dict):
                         trade["stop_order_id"] = stop_result.get("orderId") or stop_result.get("algoId")

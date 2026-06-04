@@ -1,5 +1,6 @@
 import importlib
 import importlib.util
+import json
 import os
 import sys
 import tempfile
@@ -61,12 +62,16 @@ class ProtectiveStopOrderTests(unittest.TestCase):
             "direction": "short",
             "quantity": 10,
             "status": "open",
+            "entry_price": 10,
+            "position_usd": 100,
+            "leverage": 3,
         }
 
         closed = []
         cron_scan.execute_close = lambda symbol, direction, quantity: closed.append((symbol, direction, quantity)) or {
             "success": True,
             "order": {"orderId": 456},
+            "fill_price": 10,
         }
 
         ok = cron_scan.handle_protective_stop_failure(
@@ -78,6 +83,8 @@ class ProtectiveStopOrderTests(unittest.TestCase):
         self.assertEqual(trade["status"], "closed")
         self.assertEqual(trade["exit_reason"], "protective_stop_failed")
         self.assertTrue(trade["unprotected_stop_failed"])
+        self.assertEqual(trade["pnl_source"], "protective_stop_failure_emergency_close")
+        self.assertEqual(trade["pnl_usd"], 0)
         self.assertEqual(closed, [("TONUSDT", "short", 10)])
 
     def test_recent_loss_symbols_are_not_hardcoded_without_trade_evidence(self):
@@ -127,6 +134,31 @@ class ProtectiveStopOrderTests(unittest.TestCase):
             )
             self.assertNotIn("RIVERUSDT", cron_scan.load_blacklist())
 
+    def test_symbol_enters_quarantine_by_repeated_stop_failures(self):
+        cron_scan = importlib.import_module("cron_scan")
+        config = importlib.import_module("config")
+        now = datetime.now(timezone(timedelta(hours=8)))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config.BLACKLIST_FILE = Path(tmp) / "dynamic_blacklist.json"
+            config.BLACKLIST_QUARANTINE_HOURS = 48
+            config.STOP_FAIL_BLACKLIST_THRESHOLD_24H = 2
+            data = {
+                "trades": [
+                    {"symbol": "FAILUSDT", "status": "closed", "exit_time": (now - timedelta(hours=2)).isoformat(), "exit_reason": "protective_stop_failed", "pnl_usd": 0},
+                    {"symbol": "FAILUSDT", "status": "closed", "exit_time": (now - timedelta(hours=1)).isoformat(), "exit_reason": "protective_stop_failed", "pnl_usd": 0},
+                    {"symbol": "OKUSDT", "status": "closed", "exit_time": (now - timedelta(hours=1)).isoformat(), "exit_reason": "protective_stop_failed", "pnl_usd": 0},
+                ]
+            }
+
+            blacklist = cron_scan.update_dynamic_blacklist(data)
+
+            self.assertIn("FAILUSDT", blacklist)
+            self.assertNotIn("OKUSDT", blacklist)
+            saved = json.loads(config.BLACKLIST_FILE.read_text())
+            self.assertEqual(saved["quarantine"]["FAILUSDT"]["stop_fail_24h"], 2)
+            self.assertIn("保护止损失败", saved["quarantine"]["FAILUSDT"]["reason"])
+
     def test_weak_wick_15m_spike_is_rejected(self):
         cron_scan = importlib.import_module("cron_scan")
         cron_scan.get_klines = lambda symbol, interval, limit: [
@@ -153,6 +185,46 @@ class ProtectiveStopOrderTests(unittest.TestCase):
         self.assertEqual(cand["type"], "closed_15m_spike")
         self.assertEqual(cand["direction"], "long")
         self.assertGreaterEqual(cand["volume_ratio"], 2.0)
+
+    def test_defensive_filter_blocks_closed_15m_spike_long(self):
+        cron_scan = importlib.import_module("cron_scan")
+        old_disable = cron_scan.DISABLE_CLOSED_15M_SPIKE_LONG
+        old_min_vol = cron_scan.MIN_CANDIDATE_QUOTE_VOLUME_USD
+        try:
+            cron_scan.DISABLE_CLOSED_15M_SPIKE_LONG = True
+            cron_scan.MIN_CANDIDATE_QUOTE_VOLUME_USD = 10_000_000
+            ok, reason = cron_scan.candidate_passes_defensive_filters({
+                "symbol": "FAKEUSDT",
+                "type": "closed_15m_spike",
+                "direction": "long",
+                "vol": 100_000_000,
+            })
+
+            self.assertFalse(ok)
+            self.assertIn("closed_15m_spike long", reason)
+        finally:
+            cron_scan.DISABLE_CLOSED_15M_SPIKE_LONG = old_disable
+            cron_scan.MIN_CANDIDATE_QUOTE_VOLUME_USD = old_min_vol
+
+    def test_defensive_filter_blocks_low_quote_volume(self):
+        cron_scan = importlib.import_module("cron_scan")
+        old_disable = cron_scan.DISABLE_CLOSED_15M_SPIKE_LONG
+        old_min_vol = cron_scan.MIN_CANDIDATE_QUOTE_VOLUME_USD
+        try:
+            cron_scan.DISABLE_CLOSED_15M_SPIKE_LONG = False
+            cron_scan.MIN_CANDIDATE_QUOTE_VOLUME_USD = 10_000_000
+            ok, reason = cron_scan.candidate_passes_defensive_filters({
+                "symbol": "ILLIQUSDT",
+                "type": "oi_surge",
+                "direction": "short",
+                "vol": 9_000_000,
+            })
+
+            self.assertFalse(ok)
+            self.assertIn("24h成交额", reason)
+        finally:
+            cron_scan.DISABLE_CLOSED_15M_SPIKE_LONG = old_disable
+            cron_scan.MIN_CANDIDATE_QUOTE_VOLUME_USD = old_min_vol
 
     def test_strict_backtest_reuses_clean_spike_shape_filters(self):
         strict = load_strict_spike_backtest()
