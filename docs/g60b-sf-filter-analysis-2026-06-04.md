@@ -1,6 +1,6 @@
 # G60B_SF BTC Filter 可复现分析
 
-- 生成时间: 2026-06-04T23:41:01+08:00
+- 生成时间: 2026-06-05T03:35:04+08:00
 - 窗口: 2025-05-14T10:00:00+08:00 / 2026-05-14T10:00:00+08:00
 - BTC regime: 4h EMA9/EMA21, band=0.005
 - 口径: S07 v10 regenerated trades -> net fees/slippage -> v11 base filter -> G60B prefilters -> BTC regime filter -> official v11j simulate()

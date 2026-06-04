@@ -18,6 +18,7 @@ Outputs:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import sys
@@ -49,6 +50,10 @@ G60B_PROFILE = {
     "min_mtf_agree": 4,
     "max_atr_pct": 4.5,
 }
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def load_module(path: Path, name: str):
@@ -359,6 +364,7 @@ def main() -> int:
     payload = {
         "generated_at": datetime.now(TZ_UTC8).isoformat(),
         "source": str(source.relative_to(ROOT) if source.is_relative_to(ROOT) else source),
+        "source_sha256": file_sha256(source),
         "window": {"start": START.isoformat(), "end": END.isoformat()},
         "btc_band": args.band,
         "pipeline_counts": {

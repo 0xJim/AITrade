@@ -1,6 +1,7 @@
 {
-  "generated_at": "2026-06-04T23:41:01.397535+08:00",
+  "generated_at": "2026-06-05T03:35:04.980104+08:00",
   "source": "strategies/S07-v10/data/backtest_v10_result.json",
+  "source_sha256": "59bf7b5fbe522d917dfceda0d60f301e2a9f426f0142c5e45749758690013a05",
   "window": {
     "start": "2025-05-14T10:00:00+08:00",
     "end": "2026-05-14T10:00:00+08:00"

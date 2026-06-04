@@ -1,6 +1,6 @@
 # G60B_SF BTC EMA Band Sweep
 
-- Generated: 2026-06-04T15:58:28
+- Generated: 2026-06-04T19:35:11
 - Baseline reproduced official G60B: yes
 - G60B baseline: trades=363, WR=63.6%, PnL=601.27U, DD=3.31%, PF=1.72, ROI/DD=18.14
 - Mode: reject `closed_15m_spike`/`spike` long only when BTC 4h EMA9 < EMA21 × (1 - band).
