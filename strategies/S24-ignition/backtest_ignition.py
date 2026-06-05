@@ -78,6 +78,12 @@ POSITION_PCT_LOW  = 0.07   # quality 70-79
 POSITION_PCT_MID  = 0.10   # quality 80-89
 POSITION_PCT_HIGH = 0.15   # quality 90+
 
+# 固定保证金口径：与 INITIAL_BALANCE 解耦，避免改本金时 fixed 模式变形
+FIXED_MARGIN_LOW  = 70.0
+FIXED_MARGIN_MID  = 100.0
+FIXED_MARGIN_HIGH = 150.0
+DEFAULT_MARGIN_CAP = 150.0
+
 MAX_HOLD_HOURS   = 4.0
 GRACE_HOURS      = 0.5     # 入场后 30 分钟内不触发止损
 SYM_WEEKLY_CAP   = 4       # 单 symbol 每 7 天最多开仓次数（0=不限）
@@ -253,12 +259,12 @@ def position_pct_for(quality: float) -> float:
 
 
 def fixed_margin_for(quality: float) -> float:
-    """固定保证金口径，用于消除复利放大幻觉。"""
+    """固定保证金口径，用于消除复利放大幻觉；不随 INITIAL_BALANCE 改变。"""
     if quality >= 90:
-        return INITIAL_BALANCE * POSITION_PCT_HIGH
+        return FIXED_MARGIN_HIGH
     elif quality >= 80:
-        return INITIAL_BALANCE * POSITION_PCT_MID
-    return INITIAL_BALANCE * POSITION_PCT_LOW
+        return FIXED_MARGIN_MID
+    return FIXED_MARGIN_LOW
 
 
 def generate_signals(
@@ -623,8 +629,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--hour-only",  action="store_true", help="Only trade first 15m candle of each hour (:00)")
     p.add_argument("--margin-mode", choices=["percent", "fixed", "capped"], default="percent",
                    help="Position sizing: percent=compound, fixed=70/100/150U, capped=percent but cap margin")
-    p.add_argument("--margin-cap", type=float, default=200.0,
-                   help="Max margin per trade when --margin-mode capped (default 200U)")
+    p.add_argument("--margin-cap", type=float, default=DEFAULT_MARGIN_CAP,
+                   help="Max margin per trade when --margin-mode capped (default 150U)")
     p.add_argument("--no-save",    action="store_true")
     return p.parse_args()
 
