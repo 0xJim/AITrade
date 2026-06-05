@@ -311,7 +311,9 @@ def scan_symbol(sym: str, args: argparse.Namespace, st: dict) -> dict | None:
         append_jsonl(DECISIONS_FILE, {
             "time": iso(), "symbol": sym, "status": "rejected",
             "reason": "entry_window_missed", "lag_sec": round(lag_ms / 1000, 1),
+            "quality": q, "change_pct": round(chg * 100, 3), "rsi": round(r, 2),
         })
+        notify_send(f"⏰ S24 信号被拒 {sym}\n原因: 入场窗口超时 ({lag_ms/1000:.0f}s > {args.max_entry_lag_sec}s)\n质量: {q} | 涨幅: {chg*100:.2f}% | RSI: {r:.1f}")
         return None
     # 获取入场K线的开盘价
     all15 = get_klines(sym, "15m", 3)
@@ -536,6 +538,7 @@ def run_once(args: argparse.Namespace) -> None:
             cand = scan_symbol(sym, args, st)
         except Exception as e:
             append_jsonl(DECISIONS_FILE, {"time": iso(), "symbol": sym, "status": "scan_error", "error": str(e)})
+            notify_send(f"🔴 S24 扫描异常 {sym}\n错误: {str(e)[:150]}")
             continue
         if not cand:
             continue
@@ -580,6 +583,10 @@ def main() -> int:
         except Exception as e:
             print(f"[ERROR] {e}")
             append_jsonl(DECISIONS_FILE, {"time": iso(), "status": "run_error", "error": str(e)})
+            try:
+                notify_send(f"🔴 S24 运行崩溃\n错误: {str(e)[:200]}")
+            except Exception:
+                pass
         if args.once:
             return 0
         time.sleep(args.interval)
