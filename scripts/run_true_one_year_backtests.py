@@ -19,21 +19,51 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 TZ_UTC8 = timezone(timedelta(hours=8))
-END = datetime(2026, 5, 14, 10, 0, 0, tzinfo=TZ_UTC8)
+DEFAULT_END = datetime(2026, 5, 14, 10, 0, 0, tzinfo=TZ_UTC8)
 
 
-def parse_days() -> int:
+def _arg_value(name: str) -> str | None:
+    if name not in sys.argv:
+        return None
+    idx = sys.argv.index(name)
+    if idx + 1 >= len(sys.argv):
+        raise SystemExit(f"{name} requires a value")
+    return sys.argv[idx + 1]
+
+
+def parse_dt(value: str, *, end_of_day: bool = False) -> datetime:
+    text = value.strip()
+    if "T" not in text and len(text) == 10:
+        suffix = "23:59:59" if end_of_day else "00:00:00"
+        text = f"{text}T{suffix}"
+    dt = datetime.fromisoformat(text)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=TZ_UTC8)
+    return dt
+
+
+def parse_window() -> tuple[datetime, datetime, str]:
+    start_arg = _arg_value("--start")
+    end_arg = _arg_value("--end")
+    if start_arg or end_arg:
+        if not (start_arg and end_arg):
+            raise SystemExit("--start and --end must be provided together")
+        start = parse_dt(start_arg)
+        end = parse_dt(end_arg, end_of_day=True)
+        label = f"custom_{start.strftime('%Y%m%d')}_{end.strftime('%Y%m%d')}"
+        return start, end, label
+
     if "--days" in sys.argv:
-        idx = sys.argv.index("--days")
-        if idx + 1 >= len(sys.argv):
-            raise SystemExit("--days requires a value")
-        return int(sys.argv[idx + 1])
-    return 365
+        days = int(_arg_value("--days") or "365")
+    else:
+        days = 365
+    start = DEFAULT_END - timedelta(days=days)
+    label = "one_year" if days == 365 else f"{days}d"
+    return start, DEFAULT_END, label
 
 
-BACKTEST_DAYS = parse_days()
-START = END - timedelta(days=BACKTEST_DAYS)
-RUN_LABEL = "one_year" if BACKTEST_DAYS == 365 else f"{BACKTEST_DAYS}d"
+START, END, RUN_LABEL = parse_window()
+BACKTEST_DAYS = max(1, (END - START).days)
 OUT_DIR = ROOT / "data" / f"final_true_{RUN_LABEL}_backtests"
 LOG_DIR = OUT_DIR / "logs"
 RAW_CACHE = OUT_DIR / "api_cache"
