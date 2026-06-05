@@ -233,3 +233,25 @@ bullish  = ema_bullish_at.get(prev_1h)
 | Rule 4 | 当日总亏损 > -3% 余额 | 当天停止 |
 
 测试表明动态规则有效降低 DD（10.4%），但因反应滞后导致 ROI 大幅下滑（147%），未纳入生产配置。
+
+
+## v4 最终推荐（2026-06-05）
+
+审查后修复：threshold 质量分、ATR 口径、tp-ratio 参数，并新增 fixed/capped 保证金口径。
+
+最终不推荐直接用复利版，推荐：
+
+```bash
+python3 backtest_ignition.py \
+  --days 365 \
+  --hour-only \
+  --sym-cap 5 \
+  --exclude BUSDT,BILLUSDT,BNBUSDT,LINKUSDT,SAGAUSDT \
+  --margin-mode capped \
+  --margin-cap 150 \
+  --label v4_houronly_ex5_cap5_capped150
+```
+
+结果：633 笔，WR 48.0%，ROI 160.5%，DD 8.97%，PF 1.54，ROI/DD 17.89，盈利月 12/13。
+
+详见：`docs/s24-ignition-final-v4-2026-06-05.md`。

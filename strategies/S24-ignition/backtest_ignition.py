@@ -195,11 +195,17 @@ def atr(candles: list[Candle], period: int = ATR_PERIOD) -> float:
     return sum(trs[-period:]) / period
 
 
-def signal_quality(chg_pct: float, atr_val: float, candle: Candle, history: list[Candle]) -> float:
+def signal_quality(
+    chg_pct: float,
+    atr_val: float,
+    candle: Candle,
+    history: list[Candle],
+    threshold: float = SPIKE_THRESHOLD,
+) -> float:
     """0-100 品质分，基于动量强度 / 成交量 / ATR 适中性"""
     score = 0.0
     # 涨幅强度 (0-35)
-    score += min(35.0, (chg_pct - SPIKE_THRESHOLD) / SPIKE_THRESHOLD * 20 + 20)
+    score += min(35.0, (chg_pct - threshold) / threshold * 20 + 20)
     # 成交量 vs 近期均量 (0-30)
     if len(history) >= 10:
         avg_vol = sum(c.volume for c in history[-10:]) / 10
@@ -246,6 +252,15 @@ def position_pct_for(quality: float) -> float:
     return POSITION_PCT_LOW
 
 
+def fixed_margin_for(quality: float) -> float:
+    """固定保证金口径，用于消除复利放大幻觉。"""
+    if quality >= 90:
+        return INITIAL_BALANCE * POSITION_PCT_HIGH
+    elif quality >= 80:
+        return INITIAL_BALANCE * POSITION_PCT_MID
+    return INITIAL_BALANCE * POSITION_PCT_LOW
+
+
 def generate_signals(
     symbol: str,
     klines_15m: list[Candle],
@@ -254,6 +269,7 @@ def generate_signals(
     min_rsi: float,
     min_quality: float,
     hour_only: bool = False,
+    tp_ratio: float = TP_SL_RATIO,
 ) -> list[Signal]:
     signals = []
     closes = [c.close for c in klines_15m]
@@ -278,11 +294,12 @@ def generate_signals(
         if rsi_val < min_rsi:
             continue
         # ATR 和止损
-        atr_val = atr(klines_15m[max(0, i - ATR_PERIOD - 5):i + 1])
+        # 只用信号K线之前的历史波动，避免 spike 当根放大 ATR。
+        atr_val = atr(klines_15m[max(0, i - ATR_PERIOD - 5):i])
         sl_raw  = atr_val * ATR_SL_MULT / candle.close if candle.close > 0 else MIN_SL_PCT
         sl_pct  = max(MIN_SL_PCT, min(MAX_SL_PCT, sl_raw))
         # 质量分
-        quality = signal_quality(chg, atr_val, candle, klines_15m[max(0, i - 20):i])
+        quality = signal_quality(chg, atr_val, candle, klines_15m[max(0, i - 20):i], threshold)
         if quality < min_quality:
             continue
         next_c = klines_15m[i + 1]
@@ -292,7 +309,7 @@ def generate_signals(
             entry_time=next_c.time,
             entry_price=next_c.open,
             sl_pct=sl_pct,
-            tp_pct=sl_pct * TP_SL_RATIO,
+            tp_pct=sl_pct * tp_ratio,
             quality=quality,
             position_pct=position_pct_for(quality),
             reason=f"spike {chg*100:+.2f}% rsi={rsi_val:.0f} q={quality:.0f}",
@@ -336,6 +353,8 @@ def simulate(
     grace_hours: float = GRACE_HOURS,
     sym_weekly_cap: int = SYM_WEEKLY_CAP,
     use_dynamic: bool = False,
+    margin_mode: str = "percent",
+    margin_cap: float = 0.0,
 ) -> dict:
     signals = sorted(signals, key=lambda s: s.entry_time)
     all_times = sorted({c.time for cs in klines_15m_by_symbol.values() for c in cs})
@@ -504,7 +523,13 @@ def simulate(
                 sym_entry_log[sig.symbol] = [t for t in recent if t > ts - MS_7D]
                 if len(sym_entry_log[sig.symbol]) >= sym_weekly_cap:
                     continue
-            margin = balance * sig.position_pct
+            if margin_mode == "fixed":
+                margin = fixed_margin_for(sig.quality)
+            else:
+                margin = balance * sig.position_pct
+                if margin_mode == "capped" and margin_cap > 0:
+                    margin = min(margin, margin_cap)
+            margin = min(margin, balance)
             if margin <= 0:
                 continue
             notional = margin * LEVERAGE
@@ -596,6 +621,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--sym-cap",   type=int,   default=SYM_WEEKLY_CAP, help="Max trades per symbol per 7 days (0=off)")
     p.add_argument("--dynamic",    action="store_true", help="Enable dynamic blacklist rules")
     p.add_argument("--hour-only",  action="store_true", help="Only trade first 15m candle of each hour (:00)")
+    p.add_argument("--margin-mode", choices=["percent", "fixed", "capped"], default="percent",
+                   help="Position sizing: percent=compound, fixed=70/100/150U, capped=percent but cap margin")
+    p.add_argument("--margin-cap", type=float, default=200.0,
+                   help="Max margin per trade when --margin-mode capped (default 200U)")
     p.add_argument("--no-save",    action="store_true")
     return p.parse_args()
 
@@ -616,7 +645,8 @@ def main() -> int:
     print(f"S24-Ignition  {START.date()} ~ {END.date()}  ({args.days}d)")
     dyn_flag = "ON" if args.dynamic else "off"
     hr_flag  = "ON" if args.hour_only else "off"
-    print(f"threshold={args.threshold:.3f}  quality>={args.quality}  rsi>={args.rsi}  hold={args.hold}h  tp={args.tp_ratio}x  sym_cap={args.sym_cap or 'off'}  dynamic={dyn_flag}  hour_only={hr_flag}")
+    margin_desc = args.margin_mode if args.margin_mode != "capped" else f"capped@{args.margin_cap:g}U"
+    print(f"threshold={args.threshold:.3f}  quality>={args.quality}  rsi>={args.rsi}  hold={args.hold}h  tp={args.tp_ratio}x  sym_cap={args.sym_cap or 'off'}  dynamic={dyn_flag}  hour_only={hr_flag}  margin={margin_desc}")
     print(f"symbols={len(symbols)}  exclude={exclude or 'none'}")
     print()
 
@@ -636,7 +666,7 @@ def main() -> int:
         k1h = api.klines(sym, "1h", start_ms - MS_1H * 50, end_ms)
         ema_lookup = build_ema_lookup(k1h) if k1h else {}
         sigs = generate_signals(sym, k15, ema_lookup, args.threshold, args.rsi, args.quality,
-                                hour_only=args.hour_only)
+                                hour_only=args.hour_only, tp_ratio=args.tp_ratio)
         all_sigs.extend(sigs)
 
     print(f"  信号总数: {len(all_sigs)}")
@@ -645,7 +675,8 @@ def main() -> int:
     # 模拟
     print("运行模拟...")
     result = simulate(all_sigs, k15_by_sym, max_hold_hours=args.hold,
-                      sym_weekly_cap=args.sym_cap, use_dynamic=args.dynamic)
+                      sym_weekly_cap=args.sym_cap, use_dynamic=args.dynamic,
+                      margin_mode=args.margin_mode, margin_cap=args.margin_cap)
     api.report()
 
     s = result["summary"]
@@ -693,6 +724,8 @@ def main() -> int:
                 "min_quality": args.quality, "min_rsi": args.rsi,
                 "max_hold_hours": args.hold, "tp_sl_ratio": args.tp_ratio,
                 "sym_weekly_cap": args.sym_cap, "dynamic": args.dynamic,
+                "hour_only": args.hour_only, "margin_mode": args.margin_mode,
+                "margin_cap": args.margin_cap,
                 "symbols": symbols, "exclude": list(exclude),
                 "position_pct": {"low": POSITION_PCT_LOW, "mid": POSITION_PCT_MID, "high": POSITION_PCT_HIGH},
             },
