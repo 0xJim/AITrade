@@ -23,6 +23,11 @@ S24-Ignition  回测脚本
   python3 backtest_ignition.py --days 365 --label baseline
   python3 backtest_ignition.py --days 365 --threshold 0.014 --label thresh_140bp
   python3 backtest_ignition.py --days 365 --quality 80 --label q80
+动态黑名单规则 (--dynamic):
+  Rule 1: 近10笔亏6笔        → 冷却 7天
+  Rule 2: 近10笔 PF < 0.8   → 冷却 14天
+  Rule 3: 近7天亏损 > -5%bal → 冷却 14天
+  Rule 4: 当日亏损 > -3%bal  → 当天停止开仓
 """
 from __future__ import annotations
 
@@ -32,7 +37,7 @@ import hashlib
 import json
 import math
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -72,6 +77,15 @@ POSITION_PCT_HIGH = 0.15   # quality 90+
 MAX_HOLD_HOURS   = 4.0
 GRACE_HOURS      = 0.5     # 入场后 30 分钟内不触发止损
 SYM_WEEKLY_CAP   = 4       # 单 symbol 每 7 天最多开仓次数（0=不限）
+
+# ── 动态黑名单参数 ──────────────────────────────────────────────────────
+DYN_WIN          = 10      # Rule 1&2 滑动窗口大小
+DYN_LOSS_N       = 8       # Rule 1: 窗口内亏损笔数触发阈值 (5.5% random trigger at 50% WR)
+DYN_COOL1        = 7       # Rule 1 冷却天数
+DYN_PF_MIN       = 0.8     # Rule 2: PF 下限
+DYN_COOL2        = 14      # Rule 2&3 冷却天数
+DYN_SYM_LOSS_PCT = 0.03    # Rule 3: 单币 7 天亏损占余额比例触发
+DYN_DAILY_PCT    = 0.03    # Rule 4: 当日总亏损占余额比例触发
 
 # ── 数据层 ────────────────────────────────────────────────────────────
 COMMON_SYMBOLS = [
@@ -235,6 +249,7 @@ def generate_signals(
     threshold: float,
     min_rsi: float,
     min_quality: float,
+    hour_only: bool = False,
 ) -> list[Signal]:
     signals = []
     closes = [c.close for c in klines_15m]
@@ -245,13 +260,13 @@ def generate_signals(
         chg = (candle.close - candle.open) / candle.open
         if chg < threshold:
             continue
-        # 1h EMA 趋势确认
-        bullish = ema_bullish_at.get(candle.time)
-        if bullish is None:
-            # 找最近有效的 EMA 值
-            for dt in range(candle.time - MS_1H * 2, candle.time + MS_1H, MS_1H):
-                if dt in ema_bullish_at:
-                    bullish = ema_bullish_at[dt]; break
+        # 整点过滤：只取每小时第一根 15m K 线
+        if hour_only and (candle.time % MS_1H) != 0:
+            continue
+        # 1h EMA 趋势确认：使用上一根已收盘的 1h K 线
+        # floor(candle.time / 1h) * 1h - 1h = 当前 15m 所在小时的上一小时
+        prev_1h = (candle.time // MS_1H) * MS_1H - MS_1H
+        bullish = ema_bullish_at.get(prev_1h)
         if not bullish:
             continue
         # RSI
@@ -316,6 +331,7 @@ def simulate(
     max_hold_hours: float = MAX_HOLD_HOURS,
     grace_hours: float = GRACE_HOURS,
     sym_weekly_cap: int = SYM_WEEKLY_CAP,
+    use_dynamic: bool = False,
 ) -> dict:
     signals = sorted(signals, key=lambda s: s.entry_time)
     all_times = sorted({c.time for cs in klines_15m_by_symbol.values() for c in cs})
@@ -327,7 +343,7 @@ def simulate(
     max_dd    = 0.0
     positions: list[Position] = []
     trades:    list[dict]     = []
-    cooldown:  dict[str, int] = {}   # symbol → until_ms
+    cooldown:  dict[str, int] = {}   # symbol → until_ms (4h 平仓冷却)
     # symbol → list of entry_time_ms for rolling weekly count
     sym_entry_log: dict[str, list[int]] = defaultdict(list)
     sig_queue = list(signals)
@@ -335,6 +351,15 @@ def simulate(
     next_id = 1
     monthly: dict[str, float] = {}
     by_sym:  dict[str, dict]  = defaultdict(lambda: {"trades":0,"wins":0,"pnl_usd":0.0})
+
+    # ── 动态黑名单状态 ──────────────────────────────────────────────
+    dyn_cooldown:  dict[str, int]       = {}   # symbol → until_ms (动态冷却)
+    dyn_reason:    dict[str, str]       = {}   # symbol → 触发原因（调试用）
+    sym_pnl_hist:  dict[str, deque]     = defaultdict(lambda: deque(maxlen=DYN_WIN))
+    sym_7d_log:    dict[str, list]      = defaultdict(list)  # [(ts_ms, pnl)]
+    daily_pnl:     dict[str, float]     = {}   # date_str → 当日 PnL
+    halt_until:    int                  = 0    # Rule 4 全局停止到
+    dyn_triggers:  dict[str, int]       = defaultdict(int)   # 规则触发计数
 
     for ts in all_times:
         current: dict[str, Candle] = {}
@@ -396,6 +421,59 @@ def simulate(
             })
             cooldown[pos.symbol] = ts + int(COOLDOWN_HOURS * MS_1H)
 
+            # ── 动态黑名单评估 ──────────────────────────────────────
+            if use_dynamic:
+                sym = pos.symbol
+                sym_pnl_hist[sym].append(net)
+                sym_7d_log[sym].append((ts, net))
+                sym_7d_log[sym] = [(t, p) for t, p in sym_7d_log[sym] if t > ts - MS_7D]
+                date_str = datetime.fromtimestamp(ts / 1000, tz=TZ_UTC8).strftime("%Y-%m-%d")
+                daily_pnl[date_str] = daily_pnl.get(date_str, 0.0) + net
+
+                hist = list(sym_pnl_hist[sym])
+                cur_dyn = dyn_cooldown.get(sym, 0)
+
+                # Rule 1: 近 DYN_WIN 笔亏损 >= DYN_LOSS_N → 冷却 DYN_COOL1 天
+                if len(hist) >= DYN_WIN:
+                    n_loss = sum(1 for p in hist if p <= 0)
+                    if n_loss >= DYN_LOSS_N:
+                        until = ts + DYN_COOL1 * 24 * MS_1H
+                        if until > cur_dyn:
+                            dyn_cooldown[sym] = until
+                            dyn_reason[sym] = f"rule1:{n_loss}/{DYN_WIN}losses"
+                            dyn_triggers["rule1"] += 1
+                            cur_dyn = until
+
+                # Rule 2: 近 DYN_WIN 笔 PF < DYN_PF_MIN → 冷却 DYN_COOL2 天
+                if len(hist) >= DYN_WIN:
+                    gp = sum(p for p in hist if p > 0)
+                    gl = abs(sum(p for p in hist if p <= 0))
+                    pf_win = gp / gl if gl > 0 else 99.0
+                    if pf_win < DYN_PF_MIN:
+                        until = ts + DYN_COOL2 * 24 * MS_1H
+                        if until > cur_dyn:
+                            dyn_cooldown[sym] = until
+                            dyn_reason[sym] = f"rule2:pf={pf_win:.2f}"
+                            dyn_triggers["rule2"] += 1
+                            cur_dyn = until
+
+                # Rule 3: 近 7 天单币亏损 > DYN_SYM_LOSS_PCT * balance → 冷却 DYN_COOL2 天
+                week_pnl = sum(p for _, p in sym_7d_log[sym])
+                if week_pnl < -balance * DYN_SYM_LOSS_PCT:
+                    until = ts + DYN_COOL2 * 24 * MS_1H
+                    if until > cur_dyn:
+                        dyn_cooldown[sym] = until
+                        dyn_reason[sym] = f"rule3:7d_pnl={week_pnl:.1f}"
+                        dyn_triggers["rule3"] += 1
+
+                # Rule 4: 当日总亏损 > DYN_DAILY_PCT * balance → 今天停止
+                if daily_pnl.get(date_str, 0.0) < -balance * DYN_DAILY_PCT:
+                    # 停到当天 UTC+8 23:59:59
+                    dt = datetime.fromtimestamp(ts / 1000, tz=TZ_UTC8)
+                    eod = dt.replace(hour=23, minute=59, second=59, microsecond=0)
+                    halt_until = max(halt_until, int(eod.timestamp() * 1000))
+                    dyn_triggers["rule4"] += 1
+
         positions = still_open
 
         # 开仓：处理此时间点到期的信号
@@ -409,6 +487,12 @@ def simulate(
                 continue
             if len(positions) >= MAX_POSITIONS:
                 continue
+            # 动态黑名单检查
+            if use_dynamic:
+                if ts < halt_until:
+                    continue
+                if dyn_cooldown.get(sig.symbol, 0) > ts:
+                    continue
             # 单 symbol 每周上限
             if sym_weekly_cap > 0:
                 recent = sym_entry_log[sig.symbol]
@@ -461,7 +545,7 @@ def simulate(
         wr = round(d["wins"] / d["trades"] * 100, 2) if d["trades"] else 0
         by_sym_out[sym] = {**d, "win_rate_pct": wr, "pnl_usd": round(d["pnl_usd"], 4)}
 
-    return {
+    result: dict = {
         "summary": {
             "initial_balance": initial_balance,
             "final_balance":   round(balance, 4),
@@ -481,6 +565,15 @@ def simulate(
         "by_symbol": by_sym_out,
         "trades": trades,
     }
+    if use_dynamic:
+        result["dynamic_stats"] = {
+            "rule1_triggers": dyn_triggers["rule1"],
+            "rule2_triggers": dyn_triggers["rule2"],
+            "rule3_triggers": dyn_triggers["rule3"],
+            "rule4_triggers": dyn_triggers["rule4"],
+            "sym_reasons": {k: v for k, v in dyn_reason.items()},
+        }
+    return result
 
 
 # ── 主入口 ────────────────────────────────────────────────────────────
@@ -497,7 +590,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--exclude",   default="",  help="Symbols to exclude")
     p.add_argument("--label",     default="baseline")
     p.add_argument("--sym-cap",   type=int,   default=SYM_WEEKLY_CAP, help="Max trades per symbol per 7 days (0=off)")
-    p.add_argument("--no-save",   action="store_true")
+    p.add_argument("--dynamic",    action="store_true", help="Enable dynamic blacklist rules")
+    p.add_argument("--hour-only",  action="store_true", help="Only trade first 15m candle of each hour (:00)")
+    p.add_argument("--no-save",    action="store_true")
     return p.parse_args()
 
 
@@ -515,7 +610,9 @@ def main() -> int:
     symbols = [s for s in symbols if s not in exclude]
 
     print(f"S24-Ignition  {START.date()} ~ {END.date()}  ({args.days}d)")
-    print(f"threshold={args.threshold:.3f}  quality>={args.quality}  rsi>={args.rsi}  hold={args.hold}h  tp={args.tp_ratio}x  sym_cap={args.sym_cap or 'off'}")
+    dyn_flag = "ON" if args.dynamic else "off"
+    hr_flag  = "ON" if args.hour_only else "off"
+    print(f"threshold={args.threshold:.3f}  quality>={args.quality}  rsi>={args.rsi}  hold={args.hold}h  tp={args.tp_ratio}x  sym_cap={args.sym_cap or 'off'}  dynamic={dyn_flag}  hour_only={hr_flag}")
     print(f"symbols={len(symbols)}  exclude={exclude or 'none'}")
     print()
 
@@ -534,7 +631,8 @@ def main() -> int:
     for sym, k15 in k15_by_sym.items():
         k1h = api.klines(sym, "1h", start_ms - MS_1H * 50, end_ms)
         ema_lookup = build_ema_lookup(k1h) if k1h else {}
-        sigs = generate_signals(sym, k15, ema_lookup, args.threshold, args.rsi, args.quality)
+        sigs = generate_signals(sym, k15, ema_lookup, args.threshold, args.rsi, args.quality,
+                                hour_only=args.hour_only)
         all_sigs.extend(sigs)
 
     print(f"  信号总数: {len(all_sigs)}")
@@ -542,7 +640,8 @@ def main() -> int:
 
     # 模拟
     print("运行模拟...")
-    result = simulate(all_sigs, k15_by_sym, max_hold_hours=args.hold, sym_weekly_cap=args.sym_cap)
+    result = simulate(all_sigs, k15_by_sym, max_hold_hours=args.hold,
+                      sym_weekly_cap=args.sym_cap, use_dynamic=args.dynamic)
     api.report()
 
     s = result["summary"]
@@ -563,6 +662,17 @@ def main() -> int:
         bar = ("▓" if v >= 0 else "░") * min(int(abs(v) / 30), 20)
         print(f"  {m}  {v:>+8.1f}U  {bar}")
 
+    if args.dynamic and "dynamic_stats" in result:
+        ds = result["dynamic_stats"]
+        print()
+        print("动态黑名单触发统计:")
+        print(f"  Rule1(亏损率):  {ds['rule1_triggers']} 次")
+        print(f"  Rule2(低PF):    {ds['rule2_triggers']} 次")
+        print(f"  Rule3(7天亏损): {ds['rule3_triggers']} 次")
+        print(f"  Rule4(日熔断):  {ds['rule4_triggers']} 次")
+        if ds["sym_reasons"]:
+            print(f"  最终冷却状态: {ds['sym_reasons']}")
+
     print()
     print("Top symbols:")
     by_sym = result["by_symbol"]
@@ -578,7 +688,7 @@ def main() -> int:
                 "days": args.days, "threshold": args.threshold,
                 "min_quality": args.quality, "min_rsi": args.rsi,
                 "max_hold_hours": args.hold, "tp_sl_ratio": args.tp_ratio,
-                "sym_weekly_cap": args.sym_cap,
+                "sym_weekly_cap": args.sym_cap, "dynamic": args.dynamic,
                 "symbols": symbols, "exclude": list(exclude),
                 "position_pct": {"low": POSITION_PCT_LOW, "mid": POSITION_PCT_MID, "high": POSITION_PCT_HIGH},
             },
