@@ -1,0 +1,16 @@
+[Unit]
+Description=S24 Ignition Testnet Trader
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/AITrade/strategies/S24-ignition/testnet
+ExecStart=/home/ubuntu/.hermes/hermes-agent/venv/bin/python3 s24_trader.py --loop --interval 60 --max-entry-lag-sec 120
+Restart=always
+RestartSec=10
+StandardOutput=append:%h/AITrade/strategies/S24-ignition/logs/s24_testnet.log
+StandardError=append:%h/AITrade/strategies/S24-ignition/logs/s24_testnet.log
+
+[Install]
+WantedBy=default.target

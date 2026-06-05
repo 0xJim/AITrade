@@ -1,0 +1,17 @@
+# S24 runtime files - do not commit live state/logs
+logs/
+*.log
+
+# Paper runtime state
+/data/s24_paper_state.json
+/data/s24_paper_trades.jsonl
+/data/s24_paper_decisions.jsonl
+
+# Testnet runtime state and secrets
+/testnet/data_S24/
+/testnet/.env.binance
+.env.binance
+
+# Python cache
+__pycache__/
+*.pyc
