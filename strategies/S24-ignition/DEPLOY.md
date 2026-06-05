@@ -18,13 +18,9 @@ strategies/S24-ignition/
 │   ├── s24_paper_state.json           # 运行时文件，不提交
 │   ├── s24_paper_trades.jsonl         # 运行时文件，不提交
 │   └── s24_paper_decisions.jsonl      # 运行时文件，不提交
-├── logs/                              # stdout / 运行日志，不提交
+├── logs/                              # stdout 日志，不提交
 │   ├── s24_paper.log
-│   ├── s24_testnet.log
-│   ├── s24_paper_decisions.jsonl
-│   ├── s24_decisions.jsonl
-│   ├── s24_paper_state.json
-│   └── s24_state.json
+│   └── s24_testnet.log
 ├── deploy/
 │   ├── s24-paper.service.example
 │   └── s24-testnet.service.example

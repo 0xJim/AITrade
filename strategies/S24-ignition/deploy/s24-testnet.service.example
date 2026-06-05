@@ -4,6 +4,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+# TODO: 替换为你服务器实际 python3 路径；可用 `which python3` 检查。
 Type=simple
 WorkingDirectory=%h/AITrade/strategies/S24-ignition/testnet
 ExecStart=/home/ubuntu/.hermes/hermes-agent/venv/bin/python3 s24_trader.py --loop --interval 60 --max-entry-lag-sec 120
