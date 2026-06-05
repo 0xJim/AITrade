@@ -1,0 +1,13 @@
+{"time": "2026-06-05T22:16:00.928000+08:00", "symbol": "SKYAIUSDT", "status": "sl_failed", "sl_price": 0.0, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-05T22:16:01.023000+08:00", "symbol": "SKYAIUSDT", "status": "tp_failed", "tp_price": 0.0, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-05T22:16:01.024000+08:00", "symbol": "SKYAIUSDT", "status": "opened", "position": {"id": 1, "symbol": "SKYAIUSDT", "entry_time": "2026-06-05T22:16:01.024000+08:00", "entry_time_ms": 1780668961024, "signal_time_ms": 1780668000000, "entry_price": 0.0, "margin_usd": 0.0, "notional_usd": 0.0, "quantity": 1106.0, "stop_loss": 0.0, "take_profit": 0.0, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 77.1, "change_pct": 1.677, "rsi": 74.51, "binance_order_id": 145673269}}
+{"time": "2026-06-05T22:16:01.024000+08:00", "status": "run_error", "error": "float division by zero"}
+{"time": "2026-06-05T22:17:03.295000+08:00", "symbol": "SKYAIUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 123.3}
+{"time": "2026-06-05T22:18:04.785000+08:00", "symbol": "SKYAIUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 184.8}
+{"time": "2026-06-05T22:20:09.803000+08:00", "symbol": "SKYAIUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 309.8}
+{"time": "2026-06-05T22:22:10.502000+08:00", "symbol": "SKYAIUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 430.5}
+{"time": "2026-06-05T22:22:14.895000+08:00", "symbol": "SKYAIUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 434.9}
+{"time": "2026-06-05T22:24:19.774000+08:00", "symbol": "SKYAIUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 559.8}
+{"time": "2026-06-05T22:26:24.786000+08:00", "symbol": "SKYAIUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 684.8}
+{"time": "2026-06-05T22:27:17.805000+08:00", "symbol": "SKYAIUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 737.8}
+{"time": "2026-06-05T22:28:29.782000+08:00", "symbol": "SKYAIUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 809.8}
