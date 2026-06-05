@@ -1,33 +1,37 @@
 #!/usr/bin/env python3
 """
-S24-Ignition  回测脚本
+S24-Ignition — Altcoin 小时级点火信号策略回测
 
-信号逻辑:
+信号逻辑（4 个条件全部满足）:
   1. 15m 收盘涨幅 >= SPIKE_THRESHOLD (默认 1.2%)
-  2. 1h EMA9 > EMA21 (BTC 不在下行趋势)
+  2. 1h EMA9 > EMA21  (使用前一根已收盘的 1h K 线，无前视)
   3. 15m RSI >= MIN_RSI (默认 50)
-  4. 信号质量 >= MIN_QUALITY (默认 70)
-  5. 下一根 15m 开盘入场
+  4. 信号质量分 >= MIN_QUALITY (默认 70)
+  入场: 下一根 15m 开盘价
 
-仓位:
-  quality 70-79  → POSITION_PCT_LOW   (7%)
-  quality 80-89  → POSITION_PCT_MID   (10%)
-  quality 90+    → POSITION_PCT_HIGH  (15%)
+整点过滤 (--hour-only，生产推荐):
+  仅交易每小时第一根 15m K 线 (开盘时间为 XX:00)。
+  整点开盘时机构算法重置挂单，成交量有系统性峰值，信号延续概率更高。
+
+仓位 (质量分加权):
+  quality 70-79 → 7%   (×3 杠杆)
+  quality 80-89 → 10%
+  quality 90+   → 15%
 
 退出:
-  止损: ATR × ATR_SL_MULT (下限 MIN_SL_PCT)
-  止盈: SL × TP_SL_RATIO
+  止损: ATR × 1.5，区间 [3%, 9%]
+  止盈: 止损 × 2.5
   超时: MAX_HOLD_HOURS 后按市价平
 
-用法:
-  python3 backtest_ignition.py --days 365 --label baseline
-  python3 backtest_ignition.py --days 365 --threshold 0.014 --label thresh_140bp
-  python3 backtest_ignition.py --days 365 --quality 80 --label q80
-动态黑名单规则 (--dynamic):
-  Rule 1: 近10笔亏6笔        → 冷却 7天
-  Rule 2: 近10笔 PF < 0.8   → 冷却 14天
-  Rule 3: 近7天亏损 > -5%bal → 冷却 14天
-  Rule 4: 当日亏损 > -3%bal  → 当天停止开仓
+生产配置:
+  python3 backtest_ignition.py --days 365 --hour-only --sym-cap 5 \\
+    --exclude BUSDT,BILLUSDT,BNBUSDT,LINKUSDT,SAGAUSDT
+
+动态黑名单 (--dynamic，实验性):
+  Rule 1: 近 10 笔亏 >= 8 笔         → 冷却 7 天
+  Rule 2: 近 10 笔 PF < 0.8         → 冷却 14 天
+  Rule 3: 近 7 天单币亏损 > -3% 余额  → 冷却 14 天
+  Rule 4: 当日亏损 > -3% 余额        → 当天停止
 """
 from __future__ import annotations
 
