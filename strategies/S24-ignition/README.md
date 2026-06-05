@@ -255,3 +255,27 @@ python3 backtest_ignition.py \
 结果：633 笔，WR 48.0%，ROI 160.5%，DD 8.97%，PF 1.54，ROI/DD 17.89，盈利月 12/13。
 
 详见：`docs/s24-ignition-final-v4-2026-06-05.md`。
+
+## Paper trader / 模拟盘
+
+已提供可直接运行的 S24 paper trader，不会真实下单，不需要 API key：
+
+```bash
+python3 strategies/S24-ignition/s24_paper_trader.py --once
+```
+
+常驻循环：
+
+```bash
+python3 strategies/S24-ignition/s24_paper_trader.py --loop --interval 60
+```
+
+默认就是推荐配置：hour-only + dynamic + capped150 + sym_cap=5 + 排除5币。
+
+状态/日志：
+
+```text
+strategies/S24-ignition/data/s24_paper_state.json
+strategies/S24-ignition/data/s24_paper_trades.jsonl
+strategies/S24-ignition/data/s24_paper_decisions.jsonl
+```

@@ -93,3 +93,33 @@ S24 仍然是进攻策略，不是防守主策略。它依赖高动量币种，�
 - 最大单笔盈利不超过总 PnL 的 25%
 - 单 symbol PnL 占比不超过 35%
 - 实际信号频率接近回测，不出现连续空窗或过密交易
+
+## Paper trader 模拟盘
+
+v4.1 已补充可直接运行的 paper trader：
+
+```bash
+python3 strategies/S24-ignition/s24_paper_trader.py --once
+```
+
+或常驻循环：
+
+```bash
+python3 strategies/S24-ignition/s24_paper_trader.py --loop --interval 60
+```
+
+默认参数即最终 testnet 配置：
+
+- `hour_only = true`
+- `dynamic = true`
+- `sym_cap = 5`
+- `margin_cap = 150U`
+- `exclude = BUSDT,BILLUSDT,BNBUSDT,LINKUSDT,SAGAUSDT`
+
+输出文件：
+
+- `strategies/S24-ignition/data/s24_paper_state.json`
+- `strategies/S24-ignition/data/s24_paper_trades.jsonl`
+- `strategies/S24-ignition/data/s24_paper_decisions.jsonl`
+
+注意：该脚本只做 paper trading，不会真实下单，不需要 API key。
