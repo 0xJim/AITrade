@@ -49,55 +49,50 @@
 **回测区间**：2025-05-14 ~ 2026-05-14（365 天）  
 **初始资金**：1000 USDT · **手续费**：0.04% · **滑点**：0.05% · **杠杆**：3x
 
-### 最优配置（生产推荐）
+### 最终配置（v4.1 capped300 + dynamic）
 
-```
+```bash
 python3 backtest_ignition.py \
   --days 365 \
   --hour-only \
   --sym-cap 5 \
   --exclude BUSDT,BILLUSDT,BNBUSDT,LINKUSDT,SAGAUSDT \
-  --label v3_houronly_ex5_cap5
+  --margin-mode capped \
+  --margin-cap 300 \
+  --dynamic \
+  --label v4_final_capped300_dynamic
 ```
 
 | 指标 | 数值 |
 |------|------|
-| 交易笔数 | 637 |
-| 胜率 | 48.4% |
-| ROI | **264.7%** |
-| 最大回撤 | **10.51%** |
-| Profit Factor | 1.53 |
-| ROI / DD | **25.2** |
-| 盈利月份 | 10 / 13 |
-| 月均 PnL | ~204 USDT |
+| 交易笔数 | 475 |
+| 胜率 | 50.3% |
+| ROI | **204.1%** |
+| 最大回撤 | **6.10%** |
+| Profit Factor | 1.688 |
+| ROI / DD | **33.44** |
+| 盈利月份 | 13 / 13 |
+| PnL | +2041.35U |
 
 月度分布：
 
-```
-2025-05    +33.6U  ▓
-2025-06    +62.9U  ▓
-2025-07   +159.1U  ▓▓▓
-2025-08   +135.3U  ▓▓▓
-2025-09    -12.8U  ░
-2025-10   +416.8U  ▓▓▓▓▓▓▓▓
-2025-11   +149.8U  ▓▓▓
-2025-12   +372.7U  ▓▓▓▓▓▓▓
-2026-01   +264.8U  ▓▓▓▓▓
-2026-02     -8.7U  ░
-2026-03   +299.8U  ▓▓▓▓▓▓
-2026-04    -31.5U  ░
-2026-05   +992.4U  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+```text
+2025-05   +33.6U
+2025-06   +69.2U
+2025-07  +112.9U
+2025-08  +149.8U
+2025-09    +6.4U
+2025-10  +510.2U
+2025-11  +198.7U
+2025-12  +414.6U
+2026-01   +22.6U
+2026-02  +222.1U
+2026-03   +40.1U
+2026-04   +52.0U
+2026-05  +321.3U
 ```
 
-Top symbol 贡献：
-
-| Symbol | 笔数 | WR | PnL |
-|--------|------|-----|-----|
-| LABUSDT | 86 | 45% | +598.5U |
-| SKYAIUSDT | 112 | 46% | +547.1U |
-| VVVUSDT | 96 | 52% | +497.7U |
-| GTCUSDT | 65 | 29% | +331.1U |
-| TONUSDT | 13 | 69% | +330.7U |
+> v3 houronly 的 264.7% 是旧口径，已被 v4 修复后的 capped300 + dynamic 替代，不再作为推荐结果。
 
 ### 完整参数扫描历程
 
@@ -108,7 +103,8 @@ Top symbol 贡献：
 | v3 baseline | 1247 | 45.2% | 162.8% | 20.4% | 8.0 | 11/13 | EMA修复后，信号量增4倍 |
 | v3 ex5+cap5 | 1104 | 46.0% | 172.8% | 19.2% | 9.0 | 11/13 | 修复后+排除差币 |
 | v3 q80+ex5+cap5 | 926 | 47.2% | 302.7% | 17.7% | 17.1 | 12/13 | 质量过滤，集中度过高 |
-| **v3 houronly+ex5+cap5** | **637** | **48.4%** | **264.7%** | **10.5%** | **25.2** | **10/13** | **生产推荐** |
+| v3 houronly+ex5+cap5 | 637 | 48.4% | 264.7% | 10.5% | 25.2 | 10/13 | 旧口径，已作废 |
+| **v4 capped300+dynamic** | **475** | **50.3%** | **204.1%** | **6.10%** | **33.44** | **13/13** | **当前推荐** |
 | v3 ex5+dyn+cap5 | 660 | 47.0% | 146.9% | 10.4% | 14.1 | 12/13 | 动态规则过度封锁 |
 | v3 houronly+q80+ex5 | 478 | 47.7% | 187.6% | 13.5% | 13.9 | 10/13 | 双重过滤，信号不足 |
 
@@ -202,7 +198,8 @@ python3 backtest_ignition.py \
 ignition_365d_baseline.json              # v1 基准（EMA bug era）
 ignition_365d_symcap5_ex5.json           # v1 bug era 最优（参考用）
 ignition_365d_v3_baseline.json           # EMA 修复后基准
-ignition_365d_v3_houronly_ex5_cap5.json  # ★ 生产推荐配置
+ignition_365d_v3_houronly_ex5_cap5.json  # 旧口径，已作废
+ignition_365d_v4_final_capped300_dynamic.json  # ★ 当前推荐配置
 ignition_365d_v3_q80_ex5_cap5.json       # q80 对照组
 ignition_365d_v3_ex5_dyn_cap5.json       # 动态黑名单对照组
 ...（其余为中间参数扫描结果）
@@ -279,3 +276,30 @@ strategies/S24-ignition/data/s24_paper_state.json
 strategies/S24-ignition/data/s24_paper_trades.jsonl
 strategies/S24-ignition/data/s24_paper_decisions.jsonl
 ```
+
+
+## v4.1 capped300 + dynamic 最终包（2026-06-05）
+
+最终 testnet 版本改为 capped300 + dynamic：
+
+```bash
+python3 strategies/S24-ignition/backtest_ignition.py \
+  --days 365 \
+  --hour-only \
+  --sym-cap 5 \
+  --exclude BUSDT,BILLUSDT,BNBUSDT,LINKUSDT,SAGAUSDT \
+  --margin-mode capped \
+  --margin-cap 300 \
+  --dynamic \
+  --label v4_final_capped300_dynamic
+```
+
+结果：475 笔，WR 50.3%，ROI 204.1%，DD 6.10%，PF 1.688，ROI/DD 33.44，盈利月 13/13。
+
+模拟盘：
+
+```bash
+bash strategies/S24-ignition/run_s24_paper_capped300_dynamic.sh
+```
+
+详见：`docs/s24-ignition-capped300-dynamic-package-2026-06-05.md`。

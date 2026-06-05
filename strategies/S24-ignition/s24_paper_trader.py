@@ -52,7 +52,7 @@ TP_SL_RATIO = 2.5
 MAX_HOLD_HOURS = 4.0
 GRACE_HOURS = 0.5
 SYM_WEEKLY_CAP = 5
-MARGIN_CAP = 150.0
+MARGIN_CAP = 300.0
 
 POSITION_PCT_LOW = 0.07
 POSITION_PCT_MID = 0.10
@@ -61,6 +61,7 @@ POSITION_PCT_HIGH = 0.15
 DYN_WIN = 10
 DYN_LOSS_N = 8
 DYN_PF_MIN = 0.8
+DYN_SYM_LOSS_PCT = 0.03
 DYN_COOL1_DAYS = 7
 DYN_COOL2_DAYS = 14
 DYN_DAILY_PCT = 0.03
@@ -214,6 +215,18 @@ def load_recent_trades() -> list[dict]:
     return out
 
 
+
+def trade_exit_ms(t: dict) -> int:
+    if t.get("exit_time_ms"):
+        return int(t["exit_time_ms"])
+    text = t.get("exit_time")
+    if text:
+        try:
+            return int(datetime.fromisoformat(text).timestamp() * 1000)
+        except Exception:
+            return 0
+    return 0
+
 def refresh_dynamic_cooldowns(st: dict, trades: list[dict], enable: bool) -> None:
     if not enable:
         return
@@ -232,6 +245,11 @@ def refresh_dynamic_cooldowns(st: dict, trades: list[dict], enable: bool) -> Non
                 st["dyn_cooldowns"][sym] = max(st["dyn_cooldowns"].get(sym, 0), ts + DYN_COOL1_DAYS * 24 * MS_1H)
             if pf < DYN_PF_MIN:
                 st["dyn_cooldowns"][sym] = max(st["dyn_cooldowns"].get(sym, 0), ts + DYN_COOL2_DAYS * 24 * MS_1H)
+        # Rule 3: 近 7 天单币亏损超过余额 3% → 冷却 14 天
+        cutoff_7d = ts - 7 * 24 * MS_1H
+        week_pnl = sum(t.get("pnl_usd", 0) for t in arr if trade_exit_ms(t) > cutoff_7d)
+        if week_pnl < -st.get("balance", INITIAL_BALANCE) * DYN_SYM_LOSS_PCT:
+            st["dyn_cooldowns"][sym] = max(st["dyn_cooldowns"].get(sym, 0), ts + DYN_COOL2_DAYS * 24 * MS_1H)
     day = datetime.fromtimestamp(ts / 1000, tz=TZ_UTC8).strftime("%Y-%m-%d")
     day_pnl = sum(t.get("pnl_usd", 0) for t in trades if str(t.get("exit_time", "")).startswith(day))
     if day_pnl < -st.get("balance", INITIAL_BALANCE) * DYN_DAILY_PCT:
@@ -275,7 +293,7 @@ def close_positions(st: dict, symbols: list[str]) -> None:
         net = gross - fee
         st["balance"] = max(0.0, st.get("balance", INITIAL_BALANCE) + net)
         st.setdefault("cooldowns", {})[sym] = now_ms() + COOLDOWN_HOURS * MS_1H
-        tr = {**p, "exit_time": iso(), "exit_price": round(exit_price, 8), "exit_reason": reason,
+        tr = {**p, "exit_time": iso(), "exit_time_ms": now_ms(), "exit_price": round(exit_price, 8), "exit_reason": reason,
               "pnl_usd": round(net, 4), "balance_after": round(st["balance"], 4)}
         append_jsonl(TRADES_FILE, tr)
         append_jsonl(DECISIONS_FILE, {"time": iso(), "symbol": sym, "status": "closed", "reason": reason, "pnl_usd": round(net, 4)})
@@ -303,12 +321,24 @@ def scan_symbol(sym: str, args: argparse.Namespace, st: dict) -> dict | None:
     q = signal_quality(chg, atr_val, sig, k15[-21:-1], args.threshold)
     if q < args.quality:
         return None
-    # entry uses current forming 15m open when available; otherwise last close.
+    expected_entry_time = sig.time + MS_15M
+    lag_ms = now_ms() - expected_entry_time
+    if lag_ms < 0:
+        return None
+    if lag_ms > args.max_entry_lag_sec * 1000:
+        append_jsonl(DECISIONS_FILE, {
+            "time": iso(), "symbol": sym, "status": "rejected",
+            "reason": "entry_window_missed", "signal_time": iso(sig.time),
+            "expected_entry_time": iso(expected_entry_time), "lag_sec": round(lag_ms / 1000, 1),
+        })
+        return None
     all15 = get_klines(sym, "15m", 3)
-    entry = sig.close
-    if all15 and all15[-1].time >= sig.time + MS_15M:
-        entry = all15[-1].open
-    return {"symbol": sym, "signal_time_ms": sig.time, "entry_time_ms": now_ms(),
+    entry_candle = next((c for c in all15 if c.time == expected_entry_time), None)
+    if not entry_candle:
+        append_jsonl(DECISIONS_FILE, {"time": iso(), "symbol": sym, "status": "rejected", "reason": "entry_candle_unavailable"})
+        return None
+    entry = entry_candle.open
+    return {"symbol": sym, "signal_time_ms": sig.time, "entry_time_ms": expected_entry_time,
             "entry_price_raw": entry, "sl_pct": sl_pct, "tp_pct": sl_pct * args.tp_ratio,
             "quality": q, "change_pct": round(chg * 100, 3), "rsi": round(r, 2)}
 
@@ -392,6 +422,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--tp-ratio", type=float, default=TP_SL_RATIO)
     p.add_argument("--sym-cap", type=int, default=SYM_WEEKLY_CAP)
     p.add_argument("--margin-cap", type=float, default=MARGIN_CAP)
+    p.add_argument("--max-entry-lag-sec", type=int, default=90, help="Reject signal if next-candle entry window is older than this")
     p.add_argument("--dynamic", action="store_true", default=True, help="Enable dynamic blacklist (default on)")
     p.add_argument("--no-dynamic", action="store_false", dest="dynamic", help="Disable dynamic blacklist")
     p.add_argument("--hour-only", action="store_true", default=True, help="Only trade :00 15m candle (default on)")

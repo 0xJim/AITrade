@@ -82,7 +82,7 @@ POSITION_PCT_HIGH = 0.15   # quality 90+
 FIXED_MARGIN_LOW  = 70.0
 FIXED_MARGIN_MID  = 100.0
 FIXED_MARGIN_HIGH = 150.0
-DEFAULT_MARGIN_CAP = 150.0
+DEFAULT_MARGIN_CAP = 300.0
 
 MAX_HOLD_HOURS   = 4.0
 GRACE_HOURS      = 0.5     # 入场后 30 分钟内不触发止损
@@ -630,7 +630,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--margin-mode", choices=["percent", "fixed", "capped"], default="percent",
                    help="Position sizing: percent=compound, fixed=70/100/150U, capped=percent but cap margin")
     p.add_argument("--margin-cap", type=float, default=DEFAULT_MARGIN_CAP,
-                   help="Max margin per trade when --margin-mode capped (default 150U)")
+                   help="Max margin per trade when --margin-mode capped (default 300U)")
     p.add_argument("--no-save",    action="store_true")
     return p.parse_args()
 
