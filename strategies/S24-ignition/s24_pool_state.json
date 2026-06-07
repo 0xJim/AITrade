@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "last_scan": null,
+  "active_pool": {
+    "XAGUSDT":      {"added": "2025-05-14", "note": "原始池"},
+    "XAUUSDT":      {"added": "2025-05-14", "note": "原始池"},
+    "LABUSDT":      {"added": "2025-10-17", "note": "新币点火，OOS强贡献"},
+    "SUIUSDT":      {"added": "2025-05-14", "note": "原始池"},
+    "XRPUSDT":      {"added": "2025-05-14", "note": "原始池"},
+    "CRCLUSDT":     {"added": "2026-02-09", "note": "新币点火，OOS强贡献"},
+    "SNDKUSDT":     {"added": "2026-04-07", "note": "新币点火，OOS强贡献"},
+    "TONUSDT":      {"added": "2025-05-14", "note": "原始池，OOS第一贡献"},
+    "GTCUSDT":      {"added": "2025-05-14", "note": "原始池，低WR高MFE"},
+    "1000PEPEUSDT": {"added": "2025-05-14", "note": "原始池"},
+    "SKYAIUSDT":    {"added": "2025-05-14", "note": "原始池，IS最强贡献"},
+    "VVVUSDT":      {"added": "2025-05-14", "note": "原始池"},
+    "MUUSDT":       {"added": "2026-04-07", "note": "新上市"},
+    "ADAUSDT":      {"added": "2025-05-14", "note": "原始池"},
+    "INTCUSDT":     {"added": "2026-02-02", "note": "新币点火，OOS强贡献"},
+    "LDOUSDT":      {"added": "2025-05-14", "note": "原始池，IS筛选唯一留下"},
+    "AVAXUSDT":     {"added": "2025-05-14", "note": "原始池"},
+    "PAXGUSDT":     {"added": "2025-05-14", "note": "原始池"},
+    "AAVEUSDT":     {"added": "2025-05-14", "note": "原始池"}
+  },
+  "watch_pool": {},
+  "quarantine_pool": {
+    "BUSDT":    {"demoted": "2025-05-14", "reason": "结构性异常，流动性问题", "review_after": null},
+    "BILLUSDT": {"demoted": "2025-05-14", "reason": "结构性异常", "review_after": null},
+    "BNBUSDT":  {"demoted": "2025-05-14", "reason": "回测亏损", "review_after": "2026-09-01"},
+    "LINKUSDT": {"demoted": "2025-05-14", "reason": "回测亏损", "review_after": "2026-09-01"},
+    "SAGAUSDT": {"demoted": "2025-05-14", "reason": "回测亏损", "review_after": "2026-09-01"}
+  }
+}

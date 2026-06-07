@@ -264,3 +264,30 @@ DD <= 10%
 最大单笔盈利 <= 总 PnL 的 25%
 不出现连续 5 笔止损
 ```
+
+## 12. Dynamic Pool 管理（观察/降级建议）
+
+S24 新增两个辅助脚本，只做 **候选筛选和池子健康检查**，不会自动修改交易核心参数：
+
+```bash
+cd strategies/S24-ignition
+
+# 1) 候选池历史筛选，支持断点续跑，服务器限流后可继续
+python3 screen_symbols.py --resume --delay 0.5
+
+# 2) Active Pool 衰老检测 + Watch Pool 毕业检查
+python3 s24_pool_scanner.py --dry-run
+```
+
+文件说明：
+
+- `s24_pool_state.json`：三层池初始状态，包含 Active / Watch / Quarantine。
+- `screen_symbols.py`：全市场/候选 symbol 的 spike 筛选器，输出运行结果到 `data/s24_symbol_candidates.json`。
+- `s24_pool_scanner.py`：根据最近窗口输出 promote/demote 建议，报告保存到 `data/s24_scan_report_YYYYMMDD.json`。
+
+注意：
+
+- scanner 只提供建议；是否把币从 Active 降级或从 Watch 晋升，仍需人工确认。
+- `data/s24_symbol_candidates.json` 和 `data/s24_scan_report_*.json` 是运行输出，已加入 `.gitignore`，不要提交。
+- 这套动态池基础设施不改变 capped300 + dynamic 的交易逻辑。
+
