@@ -52,6 +52,7 @@ TP_SL_RATIO = 2.5
 MAX_HOLD_HOURS = 4.0
 GRACE_HOURS = 0.5
 SYM_WEEKLY_CAP = 5
+SYM_DAILY_CAP = 2
 MARGIN_CAP = 300.0
 
 POSITION_PCT_LOW = 0.07
@@ -279,6 +280,16 @@ def weekly_entry_count(st: dict, symbol: str) -> int:
     return sum(1 for e in st["entries"] if e.get("symbol") == symbol)
 
 
+def daily_entry_count(st: dict, symbol: str) -> int:
+    """UTC+8 自然日内同一 symbol 开仓次数。"""
+    today = datetime.fromtimestamp(now_ms() / 1000, tz=TZ_UTC8).strftime("%Y-%m-%d")
+    return sum(
+        1 for e in st.get("entries", [])
+        if e.get("symbol") == symbol
+        and datetime.fromtimestamp(e.get("time", 0) / 1000, tz=TZ_UTC8).strftime("%Y-%m-%d") == today
+    )
+
+
 def close_positions(st: dict, symbols: list[str]) -> None:
     positions = st.get("positions", [])
     if not positions:
@@ -406,6 +417,8 @@ def run_once(args: argparse.Namespace) -> None:
             continue
         if args.dynamic and st.get("dyn_cooldowns", {}).get(sym, 0) > now_ms():
             continue
+        if args.sym_daily_cap > 0 and daily_entry_count(st, sym) >= args.sym_daily_cap:
+            continue
         if args.sym_cap > 0 and weekly_entry_count(st, sym) >= args.sym_cap:
             continue
         try:
@@ -436,6 +449,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--rsi", type=float, default=MIN_RSI)
     p.add_argument("--tp-ratio", type=float, default=TP_SL_RATIO)
     p.add_argument("--sym-cap", type=int, default=SYM_WEEKLY_CAP)
+    p.add_argument("--sym-daily-cap", type=int, default=SYM_DAILY_CAP)
     p.add_argument("--margin-cap", type=float, default=MARGIN_CAP)
     p.add_argument("--max-entry-lag-sec", type=int, default=120, help="Reject signal if next-candle entry window is older than this")
     p.add_argument("--dynamic", action="store_true", default=True, help="Enable dynamic blacklist (default on)")

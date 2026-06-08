@@ -248,6 +248,8 @@ class Signal:
     quality:     float
     position_pct: float
     reason:      str
+    elevation:   float = 0.0
+    raw_quality: float = 0.0
 
 
 def position_pct_for(quality: float) -> float:
@@ -276,6 +278,8 @@ def generate_signals(
     min_quality: float,
     hour_only: bool = False,
     tp_ratio: float = TP_SL_RATIO,
+    elevation_baseline_at: dict[int, float] | None = None,
+    elevation_threshold: float = 0.0,
 ) -> list[Signal]:
     signals = []
     closes = [c.close for c in klines_15m]
@@ -306,6 +310,15 @@ def generate_signals(
         sl_pct  = max(MIN_SL_PCT, min(MAX_SL_PCT, sl_raw))
         # 质量分
         quality = signal_quality(chg, atr_val, candle, klines_15m[max(0, i - 20):i], threshold)
+        raw_quality = quality
+        elevation = 0.0
+        if elevation_baseline_at:
+            baseline = elevation_baseline_at.get(prev_1h)
+            if baseline and baseline > 0:
+                elevation = (candle.close - baseline) / baseline
+                # 高位追涨保护：价格已明显高于24h基准时，只放行 q90+ 极强信号
+                if elevation_threshold > 0 and elevation > elevation_threshold and quality < 90:
+                    continue
         if quality < min_quality:
             continue
         next_c = klines_15m[i + 1]
@@ -318,7 +331,9 @@ def generate_signals(
             tp_pct=sl_pct * tp_ratio,
             quality=quality,
             position_pct=position_pct_for(quality),
-            reason=f"spike {chg*100:+.2f}% rsi={rsi_val:.0f} q={quality:.0f}",
+            reason=f"spike {chg*100:+.2f}% rsi={rsi_val:.0f} q={quality:.0f} elev={elevation*100:.1f}%",
+            elevation=elevation,
+            raw_quality=raw_quality,
         ))
     return signals
 
@@ -331,6 +346,15 @@ def build_ema_lookup(klines_1h: list[Candle]) -> dict[int, bool]:
     for i, (f, s) in enumerate(zip(e9, e21)):
         if f is not None and s is not None:
             result[klines_1h[i].time] = f > s
+    return result
+
+
+def build_elevation_lookup(klines_1h: list[Candle]) -> dict[int, float]:
+    """ts_ms → 前24根已收盘1h close均值，用于 signal_close 高位偏离过滤。"""
+    closes = [c.close for c in klines_1h]
+    result = {}
+    for i in range(23, len(klines_1h)):
+        result[klines_1h[i].time] = sum(closes[i-23:i+1]) / 24
     return result
 
 
@@ -349,6 +373,7 @@ class Position:
     sl_pct:       float
     tp_pct:       float
     quality:      float
+    elevation:    float = 0.0
 
 
 def simulate(
@@ -358,6 +383,7 @@ def simulate(
     max_hold_hours: float = MAX_HOLD_HOURS,
     grace_hours: float = GRACE_HOURS,
     sym_weekly_cap: int = SYM_WEEKLY_CAP,
+    sym_daily_cap: int = 0,
     use_dynamic: bool = False,
     margin_mode: str = "percent",
     margin_cap: float = 0.0,
@@ -375,6 +401,7 @@ def simulate(
     cooldown:  dict[str, int] = {}   # symbol → until_ms (4h 平仓冷却)
     # symbol → list of entry_time_ms for rolling weekly count
     sym_entry_log: dict[str, list[int]] = defaultdict(list)
+    sym_daily_entry_count: dict[tuple[str, str], int] = defaultdict(int)
     sig_queue = list(signals)
     next_sig_idx = 0
     next_id = 1
@@ -443,6 +470,7 @@ def simulate(
                 "exit_reason": reason,
                 "margin_usd":  round(pos.margin_usd, 4),
                 "quality":     pos.quality,
+                "elevation_pct": round(pos.elevation * 100, 3),
                 "sl_pct":      round(pos.sl_pct * 100, 3),
                 "tp_pct":      round(pos.tp_pct * 100, 3),
                 "pnl_usd":     round(net, 4),
@@ -529,6 +557,11 @@ def simulate(
                 sym_entry_log[sig.symbol] = [t for t in recent if t > ts - MS_7D]
                 if len(sym_entry_log[sig.symbol]) >= sym_weekly_cap:
                     continue
+            # 单 symbol 自然日上限（UTC+8），防止同一段行情日内反复追涨
+            if sym_daily_cap > 0:
+                day = datetime.fromtimestamp(ts / 1000, tz=TZ_UTC8).strftime("%Y-%m-%d")
+                if sym_daily_entry_count[(sig.symbol, day)] >= sym_daily_cap:
+                    continue
             if margin_mode == "fixed":
                 margin = fixed_margin_for(sig.quality)
             else:
@@ -547,9 +580,12 @@ def simulate(
             positions.append(Position(
                 id=next_id, symbol=sig.symbol, entry_time=ts, entry_price=entry,
                 margin_usd=margin, notional_usd=notional, stop_loss=sl, take_profit=tp,
-                sl_pct=sig.sl_pct, tp_pct=sig.tp_pct, quality=sig.quality,
+                sl_pct=sig.sl_pct, tp_pct=sig.tp_pct, quality=sig.quality, elevation=sig.elevation,
             ))
             sym_entry_log[sig.symbol].append(ts)
+            if sym_daily_cap > 0:
+                day = datetime.fromtimestamp(ts / 1000, tz=TZ_UTC8).strftime("%Y-%m-%d")
+                sym_daily_entry_count[(sig.symbol, day)] += 1
             next_id += 1
 
     # 未平仓：按最后收盘价强平
@@ -563,7 +599,7 @@ def simulate(
             balance = max(0.0, balance + net)
             trades.append({
                 "id": pos.id, "symbol": pos.symbol, "exit_reason": "end_of_backtest",
-                "pnl_usd": round(net, 4), "quality": pos.quality, "direction": "long",
+                "pnl_usd": round(net, 4), "quality": pos.quality, "elevation_pct": round(pos.elevation * 100, 3), "direction": "long",
                 "entry_time": datetime.fromtimestamp(pos.entry_time/1000, tz=TZ_UTC8).isoformat(),
             })
 
@@ -625,12 +661,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--exclude",   default="",  help="Symbols to exclude")
     p.add_argument("--label",     default="baseline")
     p.add_argument("--sym-cap",   type=int,   default=SYM_WEEKLY_CAP, help="Max trades per symbol per 7 days (0=off)")
+    p.add_argument("--sym-daily-cap", type=int, default=0, help="Max trades per symbol per UTC+8 day (0=off)")
     p.add_argument("--dynamic",    action="store_true", help="Enable dynamic blacklist rules")
     p.add_argument("--hour-only",  action="store_true", help="Only trade first 15m candle of each hour (:00)")
     p.add_argument("--margin-mode", choices=["percent", "fixed", "capped"], default="percent",
                    help="Position sizing: percent=compound, fixed=70/100/150U, capped=percent but cap margin")
     p.add_argument("--margin-cap", type=float, default=DEFAULT_MARGIN_CAP,
                    help="Max margin per trade when --margin-mode capped (default 150U)")
+    p.add_argument("--elevation-threshold", type=float, default=0.0,
+                   help="Reject elevated signals unless quality>=90; 0=off, e.g. 0.08")
     p.add_argument("--no-save",    action="store_true")
     return p.parse_args()
 
@@ -652,7 +691,8 @@ def main() -> int:
     dyn_flag = "ON" if args.dynamic else "off"
     hr_flag  = "ON" if args.hour_only else "off"
     margin_desc = args.margin_mode if args.margin_mode != "capped" else f"capped@{args.margin_cap:g}U"
-    print(f"threshold={args.threshold:.3f}  quality>={args.quality}  rsi>={args.rsi}  hold={args.hold}h  tp={args.tp_ratio}x  sym_cap={args.sym_cap or 'off'}  dynamic={dyn_flag}  hour_only={hr_flag}  margin={margin_desc}")
+    elev_desc = f"elev>{args.elevation_threshold:.1%} q<90 reject" if args.elevation_threshold > 0 else "off"
+    print(f"threshold={args.threshold:.3f}  quality>={args.quality}  rsi>={args.rsi}  hold={args.hold}h  tp={args.tp_ratio}x  sym_cap={args.sym_cap or 'off'}  sym_daily_cap={args.sym_daily_cap or 'off'}  dynamic={dyn_flag}  hour_only={hr_flag}  margin={margin_desc}  elevation={elev_desc}")
     print(f"symbols={len(symbols)}  exclude={exclude or 'none'}")
     print()
 
@@ -671,8 +711,11 @@ def main() -> int:
     for sym, k15 in k15_by_sym.items():
         k1h = api.klines(sym, "1h", start_ms - MS_1H * 50, end_ms)
         ema_lookup = build_ema_lookup(k1h) if k1h else {}
+        elevation_lookup = build_elevation_lookup(k1h) if k1h else {}
         sigs = generate_signals(sym, k15, ema_lookup, args.threshold, args.rsi, args.quality,
-                                hour_only=args.hour_only, tp_ratio=args.tp_ratio)
+                                hour_only=args.hour_only, tp_ratio=args.tp_ratio,
+                                elevation_baseline_at=elevation_lookup,
+                                elevation_threshold=args.elevation_threshold)
         all_sigs.extend(sigs)
 
     print(f"  信号总数: {len(all_sigs)}")
@@ -681,7 +724,8 @@ def main() -> int:
     # 模拟
     print("运行模拟...")
     result = simulate(all_sigs, k15_by_sym, max_hold_hours=args.hold,
-                      sym_weekly_cap=args.sym_cap, use_dynamic=args.dynamic,
+                      sym_weekly_cap=args.sym_cap, sym_daily_cap=args.sym_daily_cap,
+                      use_dynamic=args.dynamic,
                       margin_mode=args.margin_mode, margin_cap=args.margin_cap)
     api.report()
 
@@ -729,9 +773,10 @@ def main() -> int:
                 "days": args.days, "threshold": args.threshold,
                 "min_quality": args.quality, "min_rsi": args.rsi,
                 "max_hold_hours": args.hold, "tp_sl_ratio": args.tp_ratio,
-                "sym_weekly_cap": args.sym_cap, "dynamic": args.dynamic,
+                "sym_weekly_cap": args.sym_cap, "sym_daily_cap": args.sym_daily_cap, "dynamic": args.dynamic,
                 "hour_only": args.hour_only, "margin_mode": args.margin_mode,
                 "margin_cap": args.margin_cap,
+                "elevation_threshold": args.elevation_threshold,
                 "symbols": symbols, "exclude": list(exclude),
                 "position_pct": {"low": POSITION_PCT_LOW, "mid": POSITION_PCT_MID, "high": POSITION_PCT_HIGH},
             },

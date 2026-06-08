@@ -247,6 +247,16 @@ def weekly_entry_count(st: dict, symbol: str) -> int:
     return sum(1 for e in st["entries"] if e.get("symbol") == symbol)
 
 
+def daily_entry_count(st: dict, symbol: str) -> int:
+    """UTC+8 自然日内同一 symbol 开仓次数。"""
+    today = datetime.fromtimestamp(now_ms() / 1000, tz=TZ_UTC8).strftime("%Y-%m-%d")
+    return sum(
+        1 for e in st.get("entries", [])
+        if e.get("symbol") == symbol
+        and datetime.fromtimestamp(e.get("time", 0) / 1000, tz=TZ_UTC8).strftime("%Y-%m-%d") == today
+    )
+
+
 # ── 通知 ──────────────────────────────────────────────────────────
 
 def notify_open(pos: dict, signal: dict) -> None:
@@ -684,6 +694,8 @@ def run_once(args: argparse.Namespace) -> None:
             continue
         if args.dynamic and st.get("dyn_cooldowns", {}).get(sym, 0) > now_ms():
             continue
+        if args.sym_daily_cap > 0 and daily_entry_count(st, sym) >= args.sym_daily_cap:
+            continue
         if args.sym_cap > 0 and weekly_entry_count(st, sym) >= args.sym_cap:
             continue
         try:
@@ -716,6 +728,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--rsi", type=float, default=MIN_RSI)
     p.add_argument("--tp-ratio", type=float, default=TP_SL_RATIO)
     p.add_argument("--sym-cap", type=int, default=SYM_WEEKLY_CAP)
+    p.add_argument("--sym-daily-cap", type=int, default=SYM_DAILY_CAP)
     p.add_argument("--margin-cap", type=float, default=MARGIN_CAP)
     p.add_argument("--max-entry-lag-sec", type=int, default=MAX_ENTRY_LAG_SEC)
     p.add_argument("--dynamic", action="store_true", default=True)
