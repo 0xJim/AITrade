@@ -9,7 +9,7 @@ import requests
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
-from config import DATA_FAPI, TRADE_FAPI, MIN_VOLUME_M, BINANCE_API_KEY, BINANCE_API_SECRET
+from config import DATA_FAPI, TRADE_FAPI, MIN_VOLUME_M, BINANCE_API_KEY, BINANCE_API_SECRET, BINANCE_TESTNET
 
 TZ_UTC8 = timezone(timedelta(hours=8))
 
@@ -191,7 +191,13 @@ def close_position(symbol: str, quantity: float, direction: str) -> dict:
 
 
 def place_stop_loss_order(symbol: str, quantity: float, direction: str, stop_price: float) -> dict:
-    """挂交易所级 reduceOnly STOP_MARKET 止损单。"""
+    """挂 reduceOnly STOP_MARKET 止损单。
+
+    Binance Futures testnet 对部分条件单端点不稳定/不支持；testnet 下返回
+    software 占位，由 s24_trader 的监控循环执行软件止损。mainnet 下仍挂交易所保护单。
+    """
+    if BINANCE_TESTNET:
+        return {"orderId": "software_sl", "status": "NEW", "software": True}
     side = "SELL" if direction == "long" else "BUY"
     return place_order(
         symbol,
@@ -199,6 +205,24 @@ def place_stop_loss_order(symbol: str, quantity: float, direction: str, stop_pri
         quantity,
         order_type="STOP_MARKET",
         stop_price=stop_price,
+        reduce_only=True,
+    )
+
+
+def place_take_profit_order(symbol: str, quantity: float, direction: str, tp_price: float) -> dict:
+    """挂 reduceOnly TAKE_PROFIT_MARKET 止盈单。
+
+    testnet 下返回 software 占位，由 s24_trader 的监控循环执行软件止盈。mainnet 下仍挂交易所止盈单。
+    """
+    if BINANCE_TESTNET:
+        return {"orderId": "software_tp", "status": "NEW", "software": True}
+    side = "SELL" if direction == "long" else "BUY"
+    return place_order(
+        symbol,
+        side,
+        quantity,
+        order_type="TAKE_PROFIT_MARKET",
+        stop_price=tp_price,
         reduce_only=True,
     )
 

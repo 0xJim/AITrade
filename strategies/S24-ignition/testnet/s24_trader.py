@@ -31,6 +31,7 @@ from binance_api import (
     open_long,
     close_position,
     place_stop_loss_order,
+    place_take_profit_order,
     place_order,
     cancel_all_orders,
     get_order,
@@ -476,9 +477,7 @@ def open_position_live(st: dict, cand: dict, args: argparse.Namespace) -> bool:
         append_jsonl(DECISIONS_FILE, {"time": iso(), "symbol": sym, "status": "sl_failed",
                                        "sl_price": sl_price, "error": str(sl_result)[:200]})
 
-    tp_result = place_order(sym, "SELL", quantity,
-                            order_type="TAKE_PROFIT_MARKET",
-                            stop_price=tp_price, reduce_only=True)
+    tp_result = place_take_profit_order(sym, quantity, "long", tp_price)
     tp_ok = bool(tp_result and "orderId" in tp_result)
     if not tp_ok:
         append_jsonl(DECISIONS_FILE, {"time": iso(), "symbol": sym, "status": "tp_failed",
