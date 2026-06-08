@@ -325,7 +325,7 @@ def scan_symbol(sym: str, args: argparse.Namespace, st: dict) -> dict | None:
     chg = (sig.close - sig.open) / sig.open if sig.open > 0 else 0
     if chg < args.threshold:
         return None
-    if not prev_1h_bullish(get_klines(sym, "1h", 48), sig.time + MS_15M):
+    if not prev_1h_bullish(get_klines(sym, "1h", 80), sig.time + MS_15M):
         return None
     closes = [c.close for c in k15]
     r = rsi(closes[-(RSI_PERIOD + 6):])

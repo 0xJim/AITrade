@@ -131,6 +131,11 @@ def get_account_info() -> dict:
     return signed_get("/fapi/v2/account")
 
 
+def get_order(symbol: str, order_id: int | str) -> dict:
+    """查询订单详情，用于 MARKET avgPrice=0 时回查成交均价。"""
+    return signed_get("/fapi/v1/order", {"symbol": symbol, "orderId": order_id}) or {}
+
+
 # === 交易 ===
 
 def set_leverage(symbol: str, leverage: int) -> dict:
@@ -155,6 +160,8 @@ def place_order(symbol: str, side: str, quantity: float,
         "type": order_type,
         "quantity": quantity,
     }
+    if order_type == "MARKET":
+        params["newOrderRespType"] = "RESULT"
     if price and order_type == "LIMIT":
         params["price"] = price
         params["timeInForce"] = "GTC"
