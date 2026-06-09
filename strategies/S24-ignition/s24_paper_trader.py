@@ -26,6 +26,7 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "strategies" / "S24-ignition" / "data"
+POOL_STATE_FILE = ROOT / "strategies" / "S24-ignition" / "s24_pool_state.json"
 STATE_FILE = DATA_DIR / "s24_paper_state.json"
 TRADES_FILE = DATA_DIR / "s24_paper_trades.jsonl"
 DECISIONS_FILE = DATA_DIR / "s24_paper_decisions.jsonl"
@@ -123,6 +124,40 @@ def api_get_throttled(endpoint: str, params: dict[str, Any]) -> Any:
     result = api_get(endpoint, params)
     _last_request_ts = time.time()
     return result
+
+
+def load_pool_trade_config() -> dict[str, dict]:
+    """Return symbols that are allowed to trade from pool_state. Watch/Quarantine are excluded."""
+    if not POOL_STATE_FILE.exists():
+        return {}
+    try:
+        state = json.loads(POOL_STATE_FILE.read_text())
+    except Exception:
+        return {}
+    out: dict[str, dict] = {}
+    for key, default_cap, default_daily in [("active_pool", 300.0, 2), ("lowrisk_pool", 100.0, 1), ("probe_pool", 30.0, 1)]:
+        tier = key.replace("_pool", "")
+        for sym, ent in (state.get(key) or {}).items():
+            out[sym.upper()] = {
+                "tier": tier,
+                "margin_cap": float(ent.get("margin_cap", default_cap) or default_cap),
+                "symbol_daily_cap": int(ent.get("symbol_daily_cap", default_daily) or default_daily),
+                "first_loss_stop": bool(ent.get("first_loss_stop", tier == "active")),
+            }
+    return out
+
+
+def daily_symbol_had_loss(trades: list[dict], symbol: str) -> bool:
+    today = datetime.now(TZ_UTC8).date().isoformat()
+    for t in trades:
+        if str(t.get("symbol", "")).upper() != symbol:
+            continue
+        ts = t.get("exit_time") or t.get("time")
+        if not ts:
+            continue
+        if str(ts)[:10] == today and float(t.get("pnl_usd", 0) or 0) < 0:
+            return True
+    return False
 
 
 def get_klines(symbol: str, interval: str, limit: int = 96) -> list[Candle]:
@@ -371,7 +406,8 @@ def scan_symbol(sym: str, args: argparse.Namespace, st: dict) -> dict | None:
 
 def open_position(st: dict, cand: dict, args: argparse.Namespace) -> None:
     balance = st.get("balance", INITIAL_BALANCE)
-    margin = min(balance * pos_pct_for(cand["quality"]), args.margin_cap)
+    margin_cap = float(cand.get("margin_cap", args.margin_cap))
+    margin = min(balance * pos_pct_for(cand["quality"]), margin_cap)
     margin = min(margin, balance)
     if margin <= 0:
         return
@@ -379,7 +415,8 @@ def open_position(st: dict, cand: dict, args: argparse.Namespace) -> None:
     notional = margin * LEVERAGE
     fee = notional * FEE_RATE
     st["balance"] = max(0.0, balance - fee)
-    pos = {"id": st.get("next_id", 1), "symbol": cand["symbol"], "entry_time": iso(),
+    pos = {"id": st.get("next_id", 1), "symbol": cand["symbol"],
+        "pool_tier": cand.get("pool_tier", "active"), "entry_time": iso(),
            "entry_time_ms": cand["entry_time_ms"], "signal_time_ms": cand["signal_time_ms"],
            "entry_price": round(entry, 8), "margin_usd": round(margin, 4), "notional_usd": round(notional, 4),
            "stop_loss": round(entry * (1 - cand["sl_pct"]), 8),
@@ -388,14 +425,18 @@ def open_position(st: dict, cand: dict, args: argparse.Namespace) -> None:
            "change_pct": cand["change_pct"], "rsi": cand["rsi"]}
     st["next_id"] = pos["id"] + 1
     st.setdefault("positions", []).append(pos)
-    st.setdefault("entries", []).append({"symbol": cand["symbol"], "time": now_ms()})
+    st.setdefault("entries", []).append({"symbol": cand["symbol"], "time": now_ms(), "pool_tier": cand.get("pool_tier", "active")})
     append_jsonl(DECISIONS_FILE, {"time": iso(), "symbol": cand["symbol"], "status": "opened", "position": pos})
 
 
 def run_once(args: argparse.Namespace) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     st = load_state()
-    symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()] or COMMON_SYMBOLS
+    pool_cfg = load_pool_trade_config() if getattr(args, "use_pool_state", False) else {}
+    if pool_cfg:
+        symbols = list(pool_cfg.keys())
+    else:
+        symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()] or COMMON_SYMBOLS
     exclude = {s.strip().upper() for s in args.exclude.split(",") if s.strip()} if args.exclude else set(DEFAULT_EXCLUDE)
     symbols = [s for s in symbols if s not in exclude]
 
@@ -417,7 +458,12 @@ def run_once(args: argparse.Namespace) -> None:
             continue
         if args.dynamic and st.get("dyn_cooldowns", {}).get(sym, 0) > now_ms():
             continue
-        if args.sym_daily_cap > 0 and daily_entry_count(st, sym) >= args.sym_daily_cap:
+        cfg = pool_cfg.get(sym, {})
+        sym_daily_cap = int(cfg.get("symbol_daily_cap", args.sym_daily_cap))
+        if cfg.get("first_loss_stop") and daily_symbol_had_loss(trades, sym):
+            append_jsonl(DECISIONS_FILE, {"time": iso(), "symbol": sym, "status": "skipped", "reason": "first_loss_stop"})
+            continue
+        if sym_daily_cap > 0 and daily_entry_count(st, sym) >= sym_daily_cap:
             continue
         if args.sym_cap > 0 and weekly_entry_count(st, sym) >= args.sym_cap:
             continue
@@ -428,6 +474,9 @@ def run_once(args: argparse.Namespace) -> None:
             continue
         if not cand:
             continue
+        if cfg:
+            cand["pool_tier"] = cfg.get("tier", "active")
+            cand["margin_cap"] = cfg.get("margin_cap", args.margin_cap)
         open_position(st, cand, args)
         open_syms.add(sym)
 
@@ -442,6 +491,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--once", action="store_true", help="Run one scan cycle")
     p.add_argument("--loop", action="store_true", help="Run forever")
     p.add_argument("--interval", type=int, default=60, help="Loop interval seconds")
+    p.add_argument("--use-pool-state", action="store_true", help="Trade active/lowrisk/probe pools from s24_pool_state.json")
     p.add_argument("--symbols", default="", help="Comma-separated symbols; default COMMON_SYMBOLS")
     p.add_argument("--exclude", default=",".join(sorted(DEFAULT_EXCLUDE)), help="Comma-separated fixed exclude symbols")
     p.add_argument("--threshold", type=float, default=SPIKE_THRESHOLD)

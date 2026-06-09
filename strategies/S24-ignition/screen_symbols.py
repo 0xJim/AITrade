@@ -42,9 +42,16 @@ RSI_PERIOD      = 14
 EMA_FAST        = 9
 EMA_SLOW        = 21
 
-STRUCTURAL_EXCLUDE = {"BUSDT", "BILLUSDT"}
-EXCLUDE_PATTERNS   = ["USDCUSDT","BUSDUSDT","TUSDUSDT","USDTUSDT",
-                       "1000000","UPUSDT","DOWNUSDT","BEARUSDT","BULLUSDT"]
+STRUCTURAL_EXCLUDE = {"BUSDT", "BILLUSDT", "BNBUSDT", "LINKUSDT", "SAGAUSDT"}
+EXCLUDE_BASE = {
+    "BTC", "ETH", "BNB",
+    "USDC", "BUSD", "TUSD", "USDD", "DAI", "FDUSD", "USDP", "PYUSD",
+}
+EXCLUDE_PATTERNS = [
+    "UP", "DOWN", "BULL", "BEAR",
+    "USDCUSDT", "BUSDUSDT", "TUSDUSDT", "USDTUSDT",
+    "1000000", "NEIRO1000",
+]
 
 CANDIDATE_POOL = [
     # 当前 19 币池
@@ -66,33 +73,116 @@ CANDIDATE_POOL = [
 ]
 
 
+
+
+def load_pool_sets():
+    """读取当前 pool_state，避免把 Active/Quarantine 误报为新增 Watch。"""
+    path = OUT_DIR.parent / "s24_pool_state.json"
+    if not path.exists():
+        return set(), set()
+    try:
+        data = json.loads(path.read_text())
+        active = set((data.get("active_pool") or {}).keys())
+        quarantine = set((data.get("quarantine_pool") or {}).keys())
+        return active, quarantine
+    except Exception:
+        return set(), set()
+
 # ── 缓存 API ─────────────────────────────────────────────────────────────────
 
-def cached_get(endpoint, params):
-    key  = hashlib.sha1(json.dumps([endpoint, params], sort_keys=True).encode()).hexdigest()
+def cache_key(endpoint, params):
+    return hashlib.sha1(json.dumps([endpoint, params], sort_keys=True).encode()).hexdigest()
+
+
+def cached_get(endpoint, params=None, allow_fetch=True):
+    params = params or {}
+    key  = cache_key(endpoint, params)
     path = CACHE_DIR / f"{key}.json"
     if path.exists():
         return json.loads(path.read_text())
-    url = "https://fapi.binance.com" + endpoint + "?" + urlencode(params)
+    if not allow_fetch:
+        return None
+    url = "https://fapi.binance.com" + endpoint
+    if params:
+        url += "?" + urlencode(params)
     with urlopen(url, timeout=20) as r:
         data = json.loads(r.read())
-    path.write_text(json.dumps(data))
+    path.write_text(json.dumps(data, ensure_ascii=False))
     return data
 
-def fetch_klines(symbol, interval, start_ms, end_ms, delay=0.25):
+
+def has_cached_klines(symbol, interval, start_ms, end_ms):
+    key = cache_key("/fapi/v1/klines", {
+        "symbol": symbol, "interval": interval,
+        "startTime": start_ms, "endTime": end_ms, "limit": 1500,
+    })
+    return (CACHE_DIR / f"{key}.json").exists()
+
+
+def fetch_klines(symbol, interval, start_ms, end_ms, delay=0.25, allow_fetch=True):
     all_raw = []
     cur = start_ms
     while cur < end_ms:
         raw = cached_get("/fapi/v1/klines", {
             "symbol": symbol, "interval": interval,
             "startTime": cur, "endTime": end_ms, "limit": 1500,
-        })
+        }, allow_fetch=allow_fetch)
         if not raw: break
         all_raw.extend(raw)
         if len(raw) < 1500: break
         cur = int(raw[-1][0]) + 1
-        _time.sleep(delay)
+        if allow_fetch:
+            _time.sleep(delay)
     return all_raw
+
+
+def fetch_exchange_info(allow_fetch=True):
+    return cached_get("/fapi/v1/exchangeInfo", {}, allow_fetch=allow_fetch) or {}
+
+
+def fetch_24h_tickers(allow_fetch=True):
+    raw = cached_get("/fapi/v1/ticker/24hr", {}, allow_fetch=allow_fetch) or []
+    return {x.get("symbol"): x for x in raw if x.get("symbol")}
+
+
+def load_universe(args):
+    """自动构建 Binance USDT 永续候选 universe；失败时可回退静态池。"""
+    if args.static_pool:
+        return list(CANDIDATE_POOL), {"source": "static", "universe_size": len(CANDIDATE_POOL), "filtered_out": {}}
+
+    info = fetch_exchange_info(allow_fetch=args.fetch_new)
+    tickers = fetch_24h_tickers(allow_fetch=args.fetch_new)
+    if not info or "symbols" not in info or not tickers:
+        print("[universe] exchangeInfo/ticker 不可用，回退 CANDIDATE_POOL")
+        return list(CANDIDATE_POOL), {"source": "static_fallback", "universe_size": len(CANDIDATE_POOL), "filtered_out": {}}
+
+    filtered_out = {"not_perp_usdt": 0, "low_volume": 0, "excluded": 0}
+    out = []
+    for sym_info in info.get("symbols", []):
+        sym = sym_info.get("symbol", "")
+        base = sym_info.get("baseAsset", "")
+        if not sym:
+            continue
+        if sym_info.get("contractType") != "PERPETUAL" or sym_info.get("status") != "TRADING" or sym_info.get("quoteAsset") != "USDT":
+            filtered_out["not_perp_usdt"] += 1
+            continue
+        if sym in STRUCTURAL_EXCLUDE or base in EXCLUDE_BASE or any(p in sym for p in EXCLUDE_PATTERNS):
+            filtered_out["excluded"] += 1
+            continue
+        vol = float(tickers.get(sym, {}).get("quoteVolume", 0) or 0)
+        if vol < args.min_volume:
+            filtered_out["low_volume"] += 1
+            continue
+        out.append((sym, vol))
+    out.sort(key=lambda x: -x[1])
+    symbols = [s for s, _ in out]
+    return symbols, {
+        "source": "binance_exchangeInfo",
+        "universe_size": len(symbols),
+        "min_volume": args.min_volume,
+        "filtered_out": filtered_out,
+        "top_volume": [{"symbol": s, "quoteVolume": v} for s, v in out[:20]],
+    }
 
 
 # ── 指标计算 ─────────────────────────────────────────────────────────────────
@@ -254,6 +344,12 @@ def parse_args():
                    help="输出 Top N 候选（默认 50）")
     p.add_argument("--resume",         action="store_true",
                    help="断点续跑：加载已有结果，跳过已计算的 symbol")
+    p.add_argument("--fetch-new",      action="store_true",
+                   help="允许请求 Binance API；默认只用缓存/静态回退")
+    p.add_argument("--static-pool",    action="store_true",
+                   help="强制只扫描内置 CANDIDATE_POOL，不拉全量 universe")
+    p.add_argument("--max-symbols",    type=int, default=0,
+                   help="最多处理前 N 个 universe symbols，用于测试/分批")
     p.add_argument("--output",         default=str(OUT_DIR / "s24_symbol_candidates.json"),
                    help="输出文件路径")
     p.add_argument("--delay",          type=float, default=0.3,
@@ -278,7 +374,7 @@ def main():
 
     print(f"S24 候选池筛选  in-sample: {is_start.date()} ~ {is_end.date()}  ({args.days}d)")
     print(f"参数: fake_rate≤{args.max_fake_rate:.0%}  mfe5≥{args.min_mfe5:.0%}"
-          f"  hr_spikes≥{args.min_hr_spikes}  top{args.top}  delay={args.delay}s")
+          f"  hr_spikes≥{args.min_hr_spikes}  top{args.top}  delay={args.delay}s  fetch_new={args.fetch_new}")
 
     # 断点续跑：加载已有结果
     done_results: list[dict] = []
@@ -292,21 +388,21 @@ def main():
         except Exception as e:
             print(f"[resume] 加载失败: {e}，从头开始")
 
-    def is_excluded(sym):
-        if sym in STRUCTURAL_EXCLUDE: return True
-        for p in EXCLUDE_PATTERNS:
-            if p in sym: return True
-        return False
-
-    candidates = [s for s in CANDIDATE_POOL if not is_excluded(s) and s not in done_symbols]
-    print(f"待处理: {len(candidates)} 个（已跳过 {len(done_symbols)} 个）\n")
+    universe, universe_meta = load_universe(args)
+    if args.max_symbols and args.max_symbols > 0:
+        universe = universe[:args.max_symbols]
+    candidates = [s for s in universe if s not in done_symbols]
+    print(f"universe: {universe_meta.get('source')} size={len(universe)}  待处理: {len(candidates)} 个（已跳过 {len(done_symbols)} 个）\n")
 
     results = list(done_results)
 
     for si, sym in enumerate(candidates, 1):
         print(f"  [{si:>3}/{len(candidates)}] {sym:<20}", end="", flush=True)
         try:
-            k15_full = fetch_klines(sym, "15m", full_start_ms, full_end_ms, delay=args.delay)
+            if not args.fetch_new and not has_cached_klines(sym, "15m", full_start_ms, full_end_ms):
+                print("  skip: 无缓存K线（加 --fetch-new 拉取）")
+                continue
+            k15_full = fetch_klines(sym, "15m", full_start_ms, full_end_ms, delay=args.delay, allow_fetch=args.fetch_new)
             if not k15_full:
                 print("  skip: 无K线数据")
                 continue
@@ -319,7 +415,7 @@ def main():
                 print(f"  skip: in-sample K线不足 ({len(k15)}根)")
                 continue
 
-            k1h_full = fetch_klines(sym, "1h", full_start_ms - MS_1H*50, full_end_ms, delay=args.delay)
+            k1h_full = fetch_klines(sym, "1h", full_start_ms - MS_1H*50, full_end_ms, delay=args.delay, allow_fetch=args.fetch_new)
             k1h = [c for c in k1h_full if (is_start_ms - MS_1H*50) <= int(c[0]) <= is_end_ms]
 
             m = analyze_symbol(sym, k15, k1h)
@@ -327,7 +423,7 @@ def main():
                 m["score"] = compute_score(m)
                 results.append(m)
                 # 每完成一个 symbol 立即落盘
-                _save(results, args, out_path, is_start, is_end)
+                _save(results, args, out_path, is_start, is_end, universe_meta)
                 print(f"  ✓  spikes={m['hr_spikes']}  mfe={m['avg_mfe_hr']*100:.1f}%"
                       f"  fbk={m['fbk_pct']*100:.0f}%  score={m['score']:.1f}")
             else:
@@ -335,40 +431,71 @@ def main():
 
         except KeyboardInterrupt:
             print("\n\n中断，进度已保存。用 --resume 继续。")
-            _save(results, args, out_path, is_start, is_end)
+            _save(results, args, out_path, is_start, is_end, universe_meta)
             return
         except Exception as e:
             print(f"  error: {e}")
-            _save(results, args, out_path, is_start, is_end)
+            _save(results, args, out_path, is_start, is_end, universe_meta)
 
     # 最终输出
     print(f"\n\n计算完成: {len(results)} 个币种")
-    _save(results, args, out_path, is_start, is_end)
+    _save(results, args, out_path, is_start, is_end, universe_meta)
     _print_table(results, args)
 
 
-def _save(results, args, out_path, is_start, is_end):
+def _save(results, args, out_path, is_start, is_end, universe_meta):
     """落盘当前所有结果"""
     passed = _filter(results, args)
     passed_sorted = sorted(passed, key=lambda x: -x["score"])
-    current_pool = {"XAGUSDT","XAUUSDT","LABUSDT","SUIUSDT","XRPUSDT","CRCLUSDT",
-                    "SNDKUSDT","TONUSDT","GTCUSDT","1000PEPEUSDT","SKYAIUSDT","VVVUSDT",
-                    "MUUSDT","ADAUSDT","INTCUSDT","LDOUSDT","AVAXUSDT","PAXGUSDT","AAVEUSDT"}
+    current_pool, quarantine_pool = load_pool_sets()
     out = {
+        "generated_at": datetime.now(TZ_UTC8).isoformat(),
+        "universe": universe_meta,
         "in_sample": {"start": is_start.isoformat(), "end": is_end.isoformat()},
         "filter_params": {
             "max_fake_rate": args.max_fake_rate,
             "min_mfe5": args.min_mfe5,
             "min_hr_spikes": args.min_hr_spikes,
         },
+        "universe_size": universe_meta.get("universe_size"),
         "total_computed": len(results),
         "total_passed": len(passed_sorted),
         "all_computed": results,
-        "passed_ranked": passed_sorted,
+        "passed_candidates": passed_sorted,
+        "passed_ranked": passed_sorted,  # backward compatible alias
         "top30": [m["symbol"] for m in passed_sorted[:30]],
         "top50": [m["symbol"] for m in passed_sorted[:50]],
         "new_vs_current_top30": [m["symbol"] for m in passed_sorted[:30]
-                                  if m["symbol"] not in current_pool],
+                                  if m["symbol"] not in current_pool and m["symbol"] not in quarantine_pool],
+        "watch_recommended": [
+            {
+                "symbol": m["symbol"],
+                "added": datetime.now(TZ_UTC8).date().isoformat(),
+                "source": "screen_symbols",
+                "score": m["score"],
+                "hr_spikes": m["hr_spikes"],
+                "hr_wr": m["hr_wr"],
+                "pf_proxy": None,
+                "avg_mfe_hr": m["avg_mfe_hr"],
+                "fbk_pct": m["fbk_pct"],
+                "status": "watch",
+            }
+            for m in passed_sorted if m["symbol"] not in current_pool and m["symbol"] not in quarantine_pool
+        ],
+        "watch_pool_patch": {
+            m["symbol"]: {
+                "added": datetime.now(TZ_UTC8).date().isoformat(),
+                "source": "screen_symbols",
+                "score": m["score"],
+                "hr_spikes": m["hr_spikes"],
+                "hr_wr": round(m["hr_wr"], 4),
+                "avg_mfe_hr": round(m["avg_mfe_hr"], 4),
+                "fbk_pct": round(m["fbk_pct"], 4),
+                "note": "auto-discovered candidate; manual review required before Active",
+            }
+            for m in passed_sorted if m["symbol"] not in current_pool and m["symbol"] not in quarantine_pool
+        },
+        "rejected": [m for m in results if m not in passed_sorted],
     }
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
@@ -382,16 +509,14 @@ def _filter(results, args):
 
 def _print_table(results, args):
     passed = sorted(_filter(results, args), key=lambda x: -x["score"])
-    current_pool = {"XAGUSDT","XAUUSDT","LABUSDT","SUIUSDT","XRPUSDT","CRCLUSDT",
-                    "SNDKUSDT","TONUSDT","GTCUSDT","1000PEPEUSDT","SKYAIUSDT","VVVUSDT",
-                    "MUUSDT","ADAUSDT","INTCUSDT","LDOUSDT","AVAXUSDT","PAXGUSDT","AAVEUSDT"}
+    current_pool, quarantine_pool = load_pool_sets()
 
     print(f"\n初筛通过: {len(passed)} 个\n")
     print("%-4s %-18s %6s %6s %7s %7s %6s %5s %6s %5s %6s %s" %
           ('#','Symbol','RawSpk','HrSpk','MFEavg','Retavg','WR','Q90%','MFE5%','FBK%','Score',''))
     print('-'*105)
     for i, m in enumerate(passed[:args.top], 1):
-        tag = "[当前]" if m["symbol"] in current_pool else "[新  ]"
+        tag = "[当前]" if m["symbol"] in current_pool else ("[隔离]" if m["symbol"] in quarantine_pool else "[新  ]")
         print("%-4d %-18s %6d %6d %6.1f%% %6.2f%% %5.1f%% %4.0f%% %5.0f%% %4.0f%% %6.1f  %s" % (
             i, m["symbol"], m["raw_spikes"], m["hr_spikes"],
             m["avg_mfe_hr"]*100, m["avg_ret_hr"]*100,
@@ -399,7 +524,7 @@ def _print_table(results, args):
             m["mfe5_pct_hr"]*100, m["fbk_pct"]*100,
             m["score"], tag))
 
-    new_top30 = [m["symbol"] for m in passed[:30] if m["symbol"] not in current_pool]
+    new_top30 = [m["symbol"] for m in passed[:30] if m["symbol"] not in current_pool and m["symbol"] not in quarantine_pool]
     print(f"\nTop30 新增候选 ({len(new_top30)} 个): {new_top30}")
 
 

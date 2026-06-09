@@ -45,6 +45,7 @@ from notifier import notify, send_message_to_both
 TZ_UTC8 = timezone(timedelta(hours=8))
 MS_15M = 15 * 60 * 1000
 MS_1H = 60 * 60 * 1000
+POOL_STATE_FILE = Path(__file__).resolve().parents[1] / "s24_pool_state.json"
 
 
 @dataclass
@@ -72,7 +73,42 @@ def append_jsonl(path: Path, obj: dict) -> None:
         f.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
 
+
+def load_pool_trade_config() -> dict[str, dict]:
+    """Return symbols that are allowed to trade from pool_state. Watch/Quarantine are excluded."""
+    if not POOL_STATE_FILE.exists():
+        return {}
+    try:
+        state = json.loads(POOL_STATE_FILE.read_text())
+    except Exception:
+        return {}
+    out: dict[str, dict] = {}
+    for key, default_cap, default_daily in [("active_pool", 300.0, 2), ("lowrisk_pool", 100.0, 1), ("probe_pool", 30.0, 1)]:
+        tier = key.replace("_pool", "")
+        for sym, ent in (state.get(key) or {}).items():
+            out[sym.upper()] = {
+                "tier": tier,
+                "margin_cap": float(ent.get("margin_cap", default_cap) or default_cap),
+                "symbol_daily_cap": int(ent.get("symbol_daily_cap", default_daily) or default_daily),
+                "first_loss_stop": bool(ent.get("first_loss_stop", tier == "active")),
+            }
+    return out
+
+
+def daily_symbol_had_loss(trades: list[dict], symbol: str) -> bool:
+    today = datetime.now(TZ_UTC8).date().isoformat()
+    for t in trades:
+        if str(t.get("symbol", "")).upper() != symbol:
+            continue
+        ts = t.get("exit_time") or t.get("time")
+        if not ts:
+            continue
+        if str(ts)[:10] == today and float(t.get("pnl_usd", 0) or 0) < 0:
+            return True
+    return False
+
 # ── K线获取（用binance_api的公开数据接口） ─────────────────────────
+
 # ── K线获取（用binance_api的公开数据接口） ─────────────────────────
 
 _last_req_ts = 0.0
@@ -426,7 +462,8 @@ def record_emergency_pending(st: dict, sym: str, quantity: float, direction: str
 def open_position_live(st: dict, cand: dict, args: argparse.Namespace) -> bool:
     """在testnet真实开仓 + 挂止损止盈；保护失败则立即平仓。"""
     balance = st.get("balance", INITIAL_BALANCE)
-    margin = min(balance * pos_pct_for(cand["quality"]), args.margin_cap)
+    margin_cap = float(cand.get("margin_cap", args.margin_cap))
+    margin = min(balance * pos_pct_for(cand["quality"]), margin_cap)
     margin = min(margin, balance)
     if margin <= 0:
         return False
@@ -526,7 +563,7 @@ def open_position_live(st: dict, cand: dict, args: argparse.Namespace) -> bool:
     }
     st["next_id"] = pos["id"] + 1
     st.setdefault("positions", []).append(pos)
-    st.setdefault("entries", []).append({"symbol": sym, "time": now_ms()})
+    st.setdefault("entries", []).append({"symbol": sym, "time": now_ms(), "pool_tier": cand.get("pool_tier", "active")})
     # testnet 本地 balance 按 paper 口径只记录已实现PnL，不扣占用保证金
     st["balance"] = max(0.0, balance - fee)
 
@@ -665,7 +702,11 @@ def sync_orphan_positions(st: dict) -> None:
 def run_once(args: argparse.Namespace) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     st = load_state()
-    symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()] or COMMON_SYMBOLS
+    pool_cfg = load_pool_trade_config() if getattr(args, "use_pool_state", False) else {}
+    if pool_cfg:
+        symbols = list(pool_cfg.keys())
+    else:
+        symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()] or COMMON_SYMBOLS
     exclude = {s.strip().upper() for s in args.exclude.split(",") if s.strip()} if args.exclude else set(DEFAULT_EXCLUDE)
     symbols = [s for s in symbols if s not in exclude]
 
@@ -693,7 +734,12 @@ def run_once(args: argparse.Namespace) -> None:
             continue
         if args.dynamic and st.get("dyn_cooldowns", {}).get(sym, 0) > now_ms():
             continue
-        if args.sym_daily_cap > 0 and daily_entry_count(st, sym) >= args.sym_daily_cap:
+        cfg = pool_cfg.get(sym, {})
+        sym_daily_cap = int(cfg.get("symbol_daily_cap", args.sym_daily_cap))
+        if cfg.get("first_loss_stop") and daily_symbol_had_loss(trades, sym):
+            append_jsonl(DECISIONS_FILE, {"time": iso(), "symbol": sym, "status": "skipped", "reason": "first_loss_stop"})
+            continue
+        if sym_daily_cap > 0 and daily_entry_count(st, sym) >= sym_daily_cap:
             continue
         if args.sym_cap > 0 and weekly_entry_count(st, sym) >= args.sym_cap:
             continue
@@ -705,6 +751,9 @@ def run_once(args: argparse.Namespace) -> None:
             continue
         if not cand:
             continue
+        if cfg:
+            cand["pool_tier"] = cfg.get("tier", "active")
+            cand["margin_cap"] = cfg.get("margin_cap", args.margin_cap)
         open_position_live(st, cand, args)
         open_syms.add(sym)
 
@@ -720,6 +769,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--once", action="store_true")
     p.add_argument("--loop", action="store_true")
     p.add_argument("--interval", type=int, default=SCAN_INTERVAL)
+    p.add_argument("--use-pool-state", action="store_true", help="Trade active/lowrisk/probe pools from s24_pool_state.json")
     p.add_argument("--symbols", default="")
     p.add_argument("--exclude", default=",".join(sorted(DEFAULT_EXCLUDE)))
     p.add_argument("--threshold", type=float, default=SPIKE_THRESHOLD)

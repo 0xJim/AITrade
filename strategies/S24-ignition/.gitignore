@@ -18,3 +18,6 @@ __pycache__/
 # Dynamic pool scanner runtime outputs
 /data/s24_scan_report_*.json
 /data/s24_symbol_candidates.json
+
+# Auto pool manager reports
+/data/s24_auto_pool_report_*.json
