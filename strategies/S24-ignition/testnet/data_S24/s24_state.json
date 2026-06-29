@@ -1,0 +1,20 @@
+{
+  "balance": 4975.289838754127,
+  "positions": [],
+  "cooldowns": {
+    "SKYAIUSDT": 1780815523679,
+    "TONUSDT": 1780960584437,
+    "LABUSDT": 1780889143792,
+    "SUIUSDT": 1780823771933,
+    "XRPUSDT": 1780899341622,
+    "VVVUSDT": 1780950771525,
+    "ADAUSDT": 1780960595440
+  },
+  "next_id": 16,
+  "dyn_cooldowns": {
+    "SUIUSDT": 1782028078343
+  },
+  "halt_until": 0,
+  "entries": [],
+  "updated_at": "2026-06-29T09:48:34.362000+08:00"
+}

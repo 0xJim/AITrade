@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "updated_at": "2026-06-09T11:26:20.364867+08:00",
+  "updated_at": "2026-06-09T13:51:24.936553+08:00",
   "limits": {
     "max_active": 20,
     "max_lowrisk": 10,
@@ -21,15 +21,6 @@
     "XAUUSDT": {
       "added": "2025-05-14",
       "note": "原始池",
-      "tier": "active",
-      "source": "legacy",
-      "margin_cap": 300.0,
-      "symbol_daily_cap": 2,
-      "first_loss_stop": true
-    },
-    "LABUSDT": {
-      "added": "2025-10-17",
-      "note": "新币点火，OOS强贡献",
       "tier": "active",
       "source": "legacy",
       "margin_cap": 300.0,
@@ -173,8 +164,226 @@
     }
   },
   "lowrisk_pool": {},
-  "probe_pool": {},
-  "watch_pool": {},
+  "probe_pool": {
+    "FILUSDT": {
+      "added": "2026-06-09",
+      "source": "watch_promoted",
+      "score": 70.69,
+      "external_score": 0.0,
+      "final_score": 70.69,
+      "hr_spikes": 24,
+      "hr_wr": 0.6666666666666666,
+      "avg_mfe_hr": 0.13149884101942075,
+      "fbk_pct": 0.2827868852459016,
+      "shadow_signals": 24,
+      "shadow_wr": 0.6666666666666666,
+      "tier": "probe",
+      "shadow_pf": 0.0,
+      "probe_started": "2026-06-09",
+      "margin_cap": 30.0,
+      "symbol_daily_cap": 1,
+      "consecutive_losses": 0,
+      "probe_trades": 0,
+      "probe_pf": 0.0,
+      "probe_wr": 0.0
+    },
+    "DASHUSDT": {
+      "added": "2026-06-09",
+      "source": "watch_promoted",
+      "score": 59.23,
+      "external_score": 0.0,
+      "final_score": 59.23,
+      "hr_spikes": 58,
+      "hr_wr": 0.5,
+      "avg_mfe_hr": 0.07967232854175411,
+      "fbk_pct": 0.3932411674347158,
+      "shadow_signals": 58,
+      "shadow_wr": 0.5,
+      "tier": "probe",
+      "shadow_pf": 0.0,
+      "probe_started": "2026-06-09",
+      "margin_cap": 30.0,
+      "symbol_daily_cap": 1,
+      "consecutive_losses": 0,
+      "probe_trades": 0,
+      "probe_pf": 0.0,
+      "probe_wr": 0.0
+    },
+    "ICPUSDT": {
+      "added": "2026-06-09",
+      "source": "watch_promoted",
+      "score": 57.22,
+      "external_score": 0.0,
+      "final_score": 57.22,
+      "hr_spikes": 37,
+      "hr_wr": 0.5135135135135135,
+      "avg_mfe_hr": 0.07059661314270245,
+      "fbk_pct": 0.2822822822822823,
+      "shadow_signals": 37,
+      "shadow_wr": 0.5135135135135135,
+      "tier": "probe",
+      "shadow_pf": 0.0,
+      "probe_started": "2026-06-09",
+      "margin_cap": 30.0,
+      "symbol_daily_cap": 1,
+      "consecutive_losses": 0,
+      "probe_trades": 0,
+      "probe_pf": 0.0,
+      "probe_wr": 0.0
+    }
+  },
+  "watch_pool": {
+    "EPICUSDT": {
+      "added": "2026-06-09",
+      "source": "screen_symbols",
+      "score": 53.71,
+      "external_score": 0.0,
+      "final_score": 53.71,
+      "hr_spikes": 65,
+      "hr_wr": 0.5230769230769231,
+      "avg_mfe_hr": 0.06660593739018723,
+      "fbk_pct": 0.3309143686502177,
+      "shadow_signals": 65,
+      "shadow_wr": 0.5230769230769231,
+      "tier": "watch",
+      "shadow_pf": 0.0
+    },
+    "FETUSDT": {
+      "added": "2026-06-09",
+      "source": "screen_symbols",
+      "score": 53.48,
+      "external_score": 0.0,
+      "final_score": 53.48,
+      "hr_spikes": 32,
+      "hr_wr": 0.59375,
+      "avg_mfe_hr": 0.06843043845662497,
+      "fbk_pct": 0.3185011709601874,
+      "shadow_signals": 32,
+      "shadow_wr": 0.59375,
+      "tier": "watch",
+      "shadow_pf": 0.0
+    },
+    "STGUSDT": {
+      "added": "2026-06-09",
+      "source": "screen_symbols",
+      "score": 53.29,
+      "external_score": 0.0,
+      "final_score": 53.29,
+      "hr_spikes": 15,
+      "hr_wr": 0.6,
+      "avg_mfe_hr": 0.056861679950781605,
+      "fbk_pct": 0.2827586206896552,
+      "shadow_signals": 15,
+      "shadow_wr": 0.6,
+      "tier": "watch",
+      "shadow_pf": 0.0
+    },
+    "WLDUSDT": {
+      "added": "2026-06-09",
+      "source": "screen_symbols",
+      "score": 51.56,
+      "external_score": 0.0,
+      "final_score": 51.56,
+      "hr_spikes": 49,
+      "hr_wr": 0.5714285714285714,
+      "avg_mfe_hr": 0.05460105357716927,
+      "fbk_pct": 0.26666666666666666,
+      "shadow_signals": 49,
+      "shadow_wr": 0.5714285714285714,
+      "tier": "watch",
+      "shadow_pf": 0.0
+    },
+    "BIOUSDT": {
+      "added": "2026-06-09",
+      "source": "screen_symbols",
+      "score": 51.31,
+      "external_score": 0.0,
+      "final_score": 51.31,
+      "hr_spikes": 96,
+      "hr_wr": 0.5,
+      "avg_mfe_hr": 0.0671231567264096,
+      "fbk_pct": 0.39572192513368987,
+      "shadow_signals": 96,
+      "shadow_wr": 0.5,
+      "tier": "watch",
+      "shadow_pf": 0.0
+    },
+    "PORTALUSDT": {
+      "added": "2026-06-09",
+      "source": "screen_symbols",
+      "score": 51.08,
+      "external_score": 0.0,
+      "final_score": 51.08,
+      "hr_spikes": 58,
+      "hr_wr": 0.5517241379310345,
+      "avg_mfe_hr": 0.06194596413094374,
+      "fbk_pct": 0.3200589970501475,
+      "shadow_signals": 58,
+      "shadow_wr": 0.5517241379310345,
+      "tier": "watch",
+      "shadow_pf": 0.0
+    },
+    "UNIUSDT": {
+      "added": "2026-06-09",
+      "source": "screen_symbols",
+      "score": 50.12,
+      "external_score": 0.0,
+      "final_score": 50.12,
+      "hr_spikes": 35,
+      "hr_wr": 0.6,
+      "avg_mfe_hr": 0.053675058322158055,
+      "fbk_pct": 0.2376237623762376,
+      "shadow_signals": 35,
+      "shadow_wr": 0.6,
+      "tier": "watch",
+      "shadow_pf": 0.0
+    },
+    "ZECUSDT": {
+      "added": "2026-06-09",
+      "source": "screen_symbols",
+      "score": 49.47,
+      "external_score": 0.0,
+      "final_score": 49.47,
+      "hr_spikes": 78,
+      "hr_wr": 0.5769230769230769,
+      "avg_mfe_hr": 0.05428919282191724,
+      "fbk_pct": 0.32744405182567726,
+      "shadow_signals": 78,
+      "shadow_wr": 0.5769230769230769,
+      "tier": "watch",
+      "shadow_pf": 0.0
+    },
+    "BANKUSDT": {
+      "added": "2026-06-09",
+      "source": "screen_symbols",
+      "score": 47.89,
+      "external_score": 0.0,
+      "final_score": 47.89,
+      "hr_spikes": 101,
+      "hr_wr": 0.36633663366336633,
+      "avg_mfe_hr": 0.06418501640989206,
+      "fbk_pct": 0.3627684964200477,
+      "shadow_signals": 101,
+      "shadow_wr": 0.36633663366336633,
+      "tier": "watch",
+      "shadow_pf": 0.0
+    },
+    "PIPPINUSDT": {
+      "added": "2026-06-09",
+      "source": "screen_symbols",
+      "score": 47.88,
+      "external_score": 0.0,
+      "final_score": 47.88,
+      "hr_spikes": 117,
+      "hr_wr": 0.36752136752136755,
+      "avg_mfe_hr": 0.061495958969720384,
+      "fbk_pct": 0.3785594639865997,
+      "shadow_signals": 117,
+      "shadow_wr": 0.36752136752136755,
+      "tier": "watch",
+      "shadow_pf": 0.0
+    }
+  },
   "quarantine_pool": {
     "BUSDT": {
       "demoted": "2025-05-14",
@@ -230,7 +439,174 @@
       "added": "2026-06-09",
       "source": "auto_pool_manager",
       "failed_reviews": 0
+    },
+    "LABUSDT": {
+      "added": "2025-10-17",
+      "note": "新币点火，OOS强贡献",
+      "tier": "quarantine",
+      "source": "legacy",
+      "margin_cap": 300.0,
+      "symbol_daily_cap": 2,
+      "first_loss_stop": true,
+      "demoted": "2026-06-09",
+      "reason": "recent8_loss_ge5",
+      "review_after": "2026-06-23",
+      "failed_reviews": 0
     }
   },
-  "action_log": []
+  "action_log": [
+    {
+      "time": "2026-06-09T13:51:24.935150+08:00",
+      "symbol": "FILUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 70.69
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935163+08:00",
+      "symbol": "DASHUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 59.23
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935171+08:00",
+      "symbol": "ICPUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 57.22
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935178+08:00",
+      "symbol": "EPICUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 53.71
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935185+08:00",
+      "symbol": "FETUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 53.48
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935192+08:00",
+      "symbol": "STGUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 53.29
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935198+08:00",
+      "symbol": "WLDUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 51.56
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935210+08:00",
+      "symbol": "BIOUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 51.31
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935219+08:00",
+      "symbol": "PORTALUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 51.08
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935226+08:00",
+      "symbol": "UNIUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 50.12
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935233+08:00",
+      "symbol": "ZECUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 49.47
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935239+08:00",
+      "symbol": "BANKUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 47.89
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935248+08:00",
+      "symbol": "PIPPINUSDT",
+      "action": "candidate_to_watch",
+      "reason": "screen_passed",
+      "metrics": {
+        "final_score": 47.88
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935300+08:00",
+      "symbol": "FILUSDT",
+      "action": "watch_to_probe",
+      "reason": "probe_slot_and_strong_watch_score",
+      "metrics": {
+        "to": "probe"
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935311+08:00",
+      "symbol": "DASHUSDT",
+      "action": "watch_to_probe",
+      "reason": "probe_slot_and_strong_watch_score",
+      "metrics": {
+        "to": "probe"
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935321+08:00",
+      "symbol": "ICPUSDT",
+      "action": "watch_to_probe",
+      "reason": "probe_slot_and_strong_watch_score",
+      "metrics": {
+        "to": "probe"
+      }
+    },
+    {
+      "time": "2026-06-09T13:51:24.935466+08:00",
+      "symbol": "LABUSDT",
+      "action": "active_to_quarantine",
+      "reason": "recent8_loss_ge5",
+      "metrics": {
+        "to": "quarantine"
+      }
+    }
+  ]
 }

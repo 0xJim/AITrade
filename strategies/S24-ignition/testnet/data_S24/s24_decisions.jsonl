@@ -1,0 +1,366 @@
+{"time": "2026-06-06T08:15:25.377000+08:00", "symbol": "VVVUSDT", "status": "open_failed", "error": "{'error': 401, 'msg': '{\"code\":-2014,\"msg\":\"API-key format invalid.\"}'}"}
+{"time": "2026-06-06T08:16:42.763000+08:00", "symbol": "VVVUSDT", "status": "open_failed", "error": "{'error': 401, 'msg': '{\"code\":-2014,\"msg\":\"API-key format invalid.\"}'}"}
+{"time": "2026-06-06T08:17:59.554000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 179.6, "quality": 85.6, "change_pct": 3.858, "rsi": 74.96}
+{"time": "2026-06-06T08:19:19.761000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 259.8, "quality": 85.6, "change_pct": 3.858, "rsi": 74.96}
+{"time": "2026-06-06T08:20:39.913000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 339.9, "quality": 85.6, "change_pct": 3.858, "rsi": 74.96}
+{"time": "2026-06-06T08:22:09.264000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 429.3, "quality": 85.6, "change_pct": 3.858, "rsi": 74.96}
+{"time": "2026-06-06T08:23:38.561000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 518.6, "quality": 85.6, "change_pct": 3.858, "rsi": 74.96}
+{"time": "2026-06-06T08:25:07.927000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 607.9, "quality": 85.6, "change_pct": 3.858, "rsi": 74.96}
+{"time": "2026-06-06T08:26:39.694000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 699.7, "quality": 85.6, "change_pct": 3.858, "rsi": 74.96}
+{"time": "2026-06-06T08:28:09.051000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 789.1, "quality": 85.6, "change_pct": 3.858, "rsi": 74.96}
+{"time": "2026-06-06T08:29:38.458000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 878.5, "quality": 85.6, "change_pct": 3.858, "rsi": 74.96}
+{"time": "2026-06-06T10:15:23.860000+08:00", "symbol": "SKYAIUSDT", "status": "sl_failed", "sl_price": 0.1827868, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-06T10:15:34.221000+08:00", "symbol": "SKYAIUSDT", "status": "tp_failed", "tp_price": 0.202573, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-06T10:16:10.852000+08:00", "symbol": "SKYAIUSDT", "status": "opened", "position": {"id": 1, "symbol": "SKYAIUSDT", "entry_time": "2026-06-06T10:16:10.852000+08:00", "entry_time_ms": 1780712170852, "signal_time_ms": 1780711200000, "entry_price": 0.18844, "margin_usd": 69.9741, "notional_usd": 209.9222, "quantity": 1114.0, "stop_loss": 0.1827868, "take_profit": 0.202573, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 71.2, "change_pct": 1.437, "rsi": 54.18, "binance_order_id": 146728510}}
+{"time": "2026-06-06T13:59:47.886000+08:00", "symbol": "SKYAIUSDT", "status": "closed", "reason": "take_profit", "pnl_usd": 15.5474}
+{"time": "2026-06-06T22:15:15.592000+08:00", "symbol": "TONUSDT", "status": "sl_failed", "sl_price": 1.546568, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-06T22:15:26.039000+08:00", "symbol": "TONUSDT", "status": "tp_failed", "tp_price": 1.71398, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-06T22:15:51.851000+08:00", "symbol": "TONUSDT", "status": "opened", "position": {"id": 2, "symbol": "TONUSDT", "entry_time": "2026-06-06T22:15:51.851000+08:00", "entry_time_ms": 1780755351851, "signal_time_ms": 1780754400000, "entry_price": 1.5944, "margin_usd": 300.0129, "notional_usd": 900.0388, "quantity": 564.5, "stop_loss": 1.546568, "take_profit": 1.71398, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 99.9, "change_pct": 2.094, "rsi": 73.81, "binance_order_id": 184107088}}
+{"time": "2026-06-06T23:15:31.847000+08:00", "symbol": "SKYAIUSDT", "status": "sl_failed", "sl_price": 0.2262539, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-06T23:15:42.168000+08:00", "symbol": "SKYAIUSDT", "status": "tp_failed", "tp_price": 0.2668402, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-06T23:16:08.032000+08:00", "symbol": "SKYAIUSDT", "status": "opened", "position": {"id": 3, "symbol": "SKYAIUSDT", "entry_time": "2026-06-06T23:16:08.032000+08:00", "entry_time_ms": 1780758968032, "signal_time_ms": 1780758000000, "entry_price": 0.23785, "margin_usd": 300.0081, "notional_usd": 900.0244, "quantity": 3784.0, "stop_loss": 0.2262539, "take_profit": 0.2668402, "sl_pct": 0.04875369209711115, "tp_pct": 0.12188423024277786, "quality": 71.0, "change_pct": 1.936, "rsi": 74.74, "binance_order_id": 147965093}}
+{"time": "2026-06-06T23:49:10.775000+08:00", "symbol": "SKYAIUSDT", "status": "closed", "reason": "take_profit", "pnl_usd": 108.834}
+{"time": "2026-06-07T02:16:27.176000+08:00", "symbol": "TONUSDT", "status": "closed", "reason": "max_hold", "pnl_usd": -5.7187}
+{"time": "2026-06-07T03:15:40.050000+08:00", "symbol": "LABUSDT", "status": "sl_failed", "sl_price": 11.2388025, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-07T03:15:50.404000+08:00", "symbol": "LABUSDT", "status": "tp_failed", "tp_price": 13.7909938, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-07T03:16:28.976000+08:00", "symbol": "LABUSDT", "status": "opened", "position": {"id": 4, "symbol": "LABUSDT", "entry_time": "2026-06-07T03:16:28.976000+08:00", "entry_time_ms": 1780773388976, "signal_time_ms": 1780772400000, "entry_price": 11.968, "margin_usd": 299.2, "notional_usd": 897.6, "quantity": 75.0, "stop_loss": 11.2388025, "take_profit": 13.7909938, "sl_pct": 0.06092893564681577, "tp_pct": 0.15232233911703943, "quality": 99.9, "change_pct": 7.301, "rsi": 78.63, "binance_order_id": 329163256}}
+{"time": "2026-06-07T03:47:25.716000+08:00", "symbol": "LABUSDT", "status": "closed", "reason": "take_profit", "pnl_usd": 135.8483}
+{"time": "2026-06-07T09:15:21.918000+08:00", "symbol": "SUIUSDT", "status": "sl_failed", "sl_price": 0.718673, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-07T09:15:32.351000+08:00", "symbol": "SUIUSDT", "status": "tp_failed", "tp_price": 0.796467, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-07T09:15:58.202000+08:00", "symbol": "SUIUSDT", "status": "opened", "position": {"id": 5, "symbol": "SUIUSDT", "entry_time": "2026-06-07T09:15:58.202000+08:00", "entry_time_ms": 1780794958202, "signal_time_ms": 1780794000000, "entry_price": 0.7409, "margin_usd": 299.9904, "notional_usd": 899.9712, "quantity": 1214.7, "stop_loss": 0.718673, "take_profit": 0.796467, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 100.0, "change_pct": 2.989, "rsi": 84.24, "binance_order_id": 621265739}}
+{"time": "2026-06-07T09:16:23.015000+08:00", "symbol": "TONUSDT", "status": "sl_failed", "sl_price": 1.617863, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-07T09:16:46.022000+08:00", "symbol": "TONUSDT", "status": "tp_failed", "tp_price": 1.7929925, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-07T09:17:31.921000+08:00", "symbol": "TONUSDT", "status": "opened", "position": {"id": 6, "symbol": "TONUSDT", "entry_time": "2026-06-07T09:17:31.920000+08:00", "entry_time_ms": 1780795051921, "signal_time_ms": 1780794000000, "entry_price": 1.6679, "margin_usd": 299.9996, "notional_usd": 899.9988, "quantity": 539.6, "stop_loss": 1.617863, "take_profit": 1.7929925, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 99.0, "change_pct": 2.476, "rsi": 61.6, "binance_order_id": 185162955}}
+{"time": "2026-06-07T10:15:36.844000+08:00", "symbol": "SKYAIUSDT", "status": "sl_failed", "sl_price": 0.3452189, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-07T10:15:47.199000+08:00", "symbol": "SKYAIUSDT", "status": "tp_failed", "tp_price": 0.4284877, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-07T10:16:12.949000+08:00", "symbol": "SKYAIUSDT", "status": "opened", "position": {"id": 7, "symbol": "SKYAIUSDT", "entry_time": "2026-06-07T10:16:12.949000+08:00", "entry_time_ms": 1780798572949, "signal_time_ms": 1780797600000, "entry_price": 0.36901, "margin_usd": 289.7959, "notional_usd": 869.3876, "quantity": 2356.0, "stop_loss": 0.3452189, "take_profit": 0.4284877, "sl_pct": 0.06447277712798502, "tp_pct": 0.16118194281996256, "quality": 75.7, "change_pct": 2.698, "rsi": 60.57, "binance_order_id": 149038077}}
+{"time": "2026-06-07T10:58:43.680000+08:00", "symbol": "SKYAIUSDT", "status": "closed", "reason": "stop_loss", "pnl_usd": -56.8063}
+{"time": "2026-06-07T13:16:11.934000+08:00", "symbol": "SUIUSDT", "status": "closed", "reason": "max_hold", "pnl_usd": -900.3312}
+{"time": "2026-06-07T13:16:34.970000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:17:35.286000+08:00", "symbol": "TONUSDT", "status": "closed", "reason": "max_hold", "pnl_usd": 13.7519}
+{"time": "2026-06-07T13:17:58.165000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:18:58.166000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:19:58.167000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:20:58.168000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:21:58.169000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:22:58.170000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:23:58.171000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:24:58.172000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:25:58.174000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:26:58.175000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:27:58.176000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:28:58.177000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:29:58.178000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:30:58.179000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:31:58.180000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:32:58.181000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:33:58.183000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:34:58.184000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:35:58.185000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:36:58.186000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:37:58.187000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:38:58.189000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:39:58.190000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:40:58.191000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:41:58.192000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:42:58.193000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:43:58.194000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:44:58.195000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:45:58.196000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:46:58.197000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:47:58.198000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:48:58.200000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:49:58.201000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:50:58.202000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:51:58.203000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:52:58.204000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:53:58.205000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:54:58.206000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:55:58.207000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:56:58.208000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:57:58.210000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:58:58.211000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T13:59:58.212000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:00:58.214000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:01:58.215000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:02:58.216000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:03:58.218000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:04:58.219000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:05:58.220000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:06:58.221000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:07:58.222000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:08:58.224000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:09:58.225000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:10:58.226000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:11:58.227000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:12:58.228000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:13:58.229000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:14:58.230000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:15:58.231000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:16:58.232000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:17:58.234000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:18:58.235000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:19:58.236000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:20:58.238000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:21:58.239000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:22:58.240000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:23:58.241000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:24:58.242000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:25:58.244000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:26:58.245000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:27:58.246000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:28:58.247000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:29:58.248000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:30:58.249000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:31:58.250000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:32:58.251000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:33:58.252000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:34:58.253000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:35:58.254000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:36:58.256000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:37:58.257000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:38:58.258000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:39:58.259000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:40:58.260000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:41:58.261000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:42:58.262000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:43:58.263000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:44:58.265000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:45:58.266000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:46:58.267000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:47:58.268000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:48:58.269000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:49:58.270000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:50:58.271000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:51:58.273000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:52:58.274000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:53:58.275000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:54:58.276000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:55:58.277000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:56:58.278000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:57:58.279000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:58:58.280000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T14:59:58.281000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:00:58.282000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:01:58.283000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:02:58.287000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:03:58.288000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:04:58.289000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:05:58.290000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:06:58.291000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:07:58.293000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:08:58.294000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:09:58.295000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:10:58.296000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:11:58.297000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:12:58.298000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:13:58.299000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:14:58.300000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:15:58.302000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:16:58.303000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:17:58.304000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:18:58.305000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:19:58.306000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:20:58.307000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:21:58.309000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:22:58.310000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:23:58.311000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:24:58.312000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:25:58.313000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:26:58.314000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:27:58.315000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:28:58.316000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:29:58.319000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:30:58.320000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:31:58.323000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:32:58.324000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:33:58.325000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:34:58.326000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:35:58.327000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:36:58.328000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:37:58.329000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:38:58.330000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:39:58.333000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:40:58.334000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:41:58.335000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:42:58.336000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:43:58.337000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:44:58.339000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:45:58.341000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:46:58.342000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:47:58.343000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:49:07.110000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:50:07.111000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:51:07.112000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:52:07.113000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:53:07.115000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:54:07.116000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:55:07.117000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:56:07.118000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:57:07.119000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:58:07.120000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T15:59:07.121000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:00:07.122000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:01:07.123000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:02:07.124000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:03:07.125000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:04:07.126000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:05:07.128000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:06:07.129000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:07:07.130000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:08:07.131000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:09:07.132000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:10:07.133000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:11:07.134000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:12:07.135000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:13:07.136000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:14:07.137000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:15:07.139000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:16:07.140000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:17:07.141000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:18:07.142000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:19:07.143000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:20:07.144000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:21:07.145000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:22:07.147000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:23:07.148000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:24:07.149000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:25:07.150000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:26:07.151000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:27:07.152000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:28:07.153000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:29:07.155000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:30:07.156000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:31:07.157000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:32:07.158000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:33:07.159000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:34:07.160000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:35:07.161000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:36:07.162000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:37:07.163000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T16:38:07.164000+08:00", "status": "halted", "until": "2026-06-07T23:59:59+08:00"}
+{"time": "2026-06-07T19:15:19.265000+08:00", "symbol": "LABUSDT", "status": "sl_tp_software", "reason": "testnet_no_conditional_orders", "sl_price": 12.87384, "tp_price": 14.2674}
+{"time": "2026-06-07T19:15:19.266000+08:00", "symbol": "LABUSDT", "status": "opened", "position": {"id": 8, "symbol": "LABUSDT", "entry_time": "2026-06-07T19:15:19.266000+08:00", "entry_time_ms": 1780830919266, "signal_time_ms": 1780830000000, "entry_price": 13.272, "margin_usd": 300.832, "notional_usd": 902.496, "quantity": 68.0, "stop_loss": 12.87384, "take_profit": 14.2674, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 77.5, "change_pct": 1.748, "rsi": 53.37, "binance_order_id": 333732436}}
+{"time": "2026-06-07T19:56:47.249000+08:00", "symbol": "LABUSDT", "status": "closed", "reason": "stop_loss", "pnl_usd": -27.8736}
+{"time": "2026-06-08T01:15:45.617000+08:00", "symbol": "LABUSDT", "status": "sl_tp_software", "reason": "testnet_no_conditional_orders", "sl_price": 13.5757857, "tp_price": 15.4455357}
+{"time": "2026-06-08T01:15:45.617000+08:00", "symbol": "LABUSDT", "status": "opened", "position": {"id": 9, "symbol": "LABUSDT", "entry_time": "2026-06-08T01:15:45.617000+08:00", "entry_time_ms": 1780852545617, "signal_time_ms": 1780851600000, "entry_price": 14.11, "margin_usd": 301.0133, "notional_usd": 903.04, "quantity": 64.0, "stop_loss": 13.5757857, "take_profit": 15.4455357, "sl_pct": 0.03786068644325199, "tp_pct": 0.09465171610812997, "quality": 85.3, "change_pct": 2.158, "rsi": 77.79, "binance_order_id": 335370328}}
+{"time": "2026-06-08T01:46:33.496000+08:00", "symbol": "LABUSDT", "status": "closed", "reason": "stop_loss", "pnl_usd": -34.9854}
+{"time": "2026-06-08T06:15:26.782000+08:00", "symbol": "LABUSDT", "status": "sl_tp_software", "reason": "testnet_no_conditional_orders", "sl_price": 12.96599, "tp_price": 14.369525}
+{"time": "2026-06-08T06:15:26.782000+08:00", "symbol": "LABUSDT", "status": "opened", "position": {"id": 10, "symbol": "LABUSDT", "entry_time": "2026-06-08T06:15:26.782000+08:00", "entry_time_ms": 1780870526782, "signal_time_ms": 1780869600000, "entry_price": 13.367, "margin_usd": 298.5297, "notional_usd": 895.589, "quantity": 67.0, "stop_loss": 12.96599, "take_profit": 14.369525, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 82.3, "change_pct": 2.217, "rsi": 54.63, "binance_order_id": 336752779}}
+{"time": "2026-06-08T06:15:37.907000+08:00", "symbol": "XRPUSDT", "status": "sl_tp_software", "reason": "testnet_no_conditional_orders", "sl_price": 1.1275, "tp_price": 1.2496}
+{"time": "2026-06-08T06:15:37.908000+08:00", "symbol": "XRPUSDT", "status": "opened", "position": {"id": 11, "symbol": "XRPUSDT", "entry_time": "2026-06-08T06:15:37.908000+08:00", "entry_time_ms": 1780870537908, "signal_time_ms": 1780869600000, "entry_price": 1.1624, "margin_usd": 300.0154, "notional_usd": 900.0463, "quantity": 774.3, "stop_loss": 1.1275, "take_profit": 1.2496, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 100.0, "change_pct": 2.885, "rsi": 62.62, "binance_order_id": 1778176845}}
+{"time": "2026-06-08T06:15:48.965000+08:00", "symbol": "CRCLUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-4411,\"msg\":\"Please sign TradFi-Perps agreement contract fapi.\"}'}"}
+{"time": "2026-06-08T06:16:00.427000+08:00", "symbol": "TONUSDT", "status": "sl_tp_software", "reason": "testnet_no_conditional_orders", "sl_price": 1.664423, "tp_price": 1.8445925}
+{"time": "2026-06-08T06:16:00.428000+08:00", "symbol": "TONUSDT", "status": "opened", "position": {"id": 12, "symbol": "TONUSDT", "entry_time": "2026-06-08T06:16:00.428000+08:00", "entry_time_ms": 1780870560428, "signal_time_ms": 1780869600000, "entry_price": 1.7159, "margin_usd": 299.9965, "notional_usd": 899.9896, "quantity": 524.5, "stop_loss": 1.664423, "take_profit": 1.8445925, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 89.0, "change_pct": 3.343, "rsi": 51.42, "binance_order_id": 187149511}}
+{"time": "2026-06-08T07:25:43.793000+08:00", "symbol": "LABUSDT", "status": "closed", "reason": "stop_loss", "pnl_usd": -27.6603}
+{"time": "2026-06-08T08:15:26.845000+08:00", "symbol": "CRCLUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-4411,\"msg\":\"Please sign TradFi-Perps agreement contract fapi.\"}'}"}
+{"time": "2026-06-08T08:15:38.115000+08:00", "symbol": "SNDKUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-1121,\"msg\":\"Invalid symbol.\"}'}"}
+{"time": "2026-06-08T08:15:50.016000+08:00", "symbol": "MUUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-1121,\"msg\":\"Invalid symbol.\"}'}"}
+{"time": "2026-06-08T08:17:03.039000+08:00", "symbol": "CRCLUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-4411,\"msg\":\"Please sign TradFi-Perps agreement contract fapi.\"}'}"}
+{"time": "2026-06-08T08:17:26.869000+08:00", "symbol": "SNDKUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-1121,\"msg\":\"Invalid symbol.\"}'}"}
+{"time": "2026-06-08T08:17:51.495000+08:00", "symbol": "MUUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-1121,\"msg\":\"Invalid symbol.\"}'}"}
+{"time": "2026-06-08T08:19:17.201000+08:00", "symbol": "CRCLUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-4411,\"msg\":\"Please sign TradFi-Perps agreement contract fapi.\"}'}"}
+{"time": "2026-06-08T08:19:40.947000+08:00", "symbol": "SNDKUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-1121,\"msg\":\"Invalid symbol.\"}'}"}
+{"time": "2026-06-08T08:20:05.103000+08:00", "symbol": "MUUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 305.1, "quality": 100.0, "change_pct": 2.464, "rsi": 59.02}
+{"time": "2026-06-08T08:21:30.116000+08:00", "symbol": "CRCLUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 390.1, "quality": 95.7, "change_pct": 1.844, "rsi": 84.7}
+{"time": "2026-06-08T08:21:53.367000+08:00", "symbol": "SNDKUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 413.4, "quality": 76.8, "change_pct": 1.22, "rsi": 58.25}
+{"time": "2026-06-08T08:22:17.248000+08:00", "symbol": "MUUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 437.2, "quality": 100.0, "change_pct": 2.464, "rsi": 59.02}
+{"time": "2026-06-08T08:23:42.402000+08:00", "symbol": "CRCLUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 522.4, "quality": 95.7, "change_pct": 1.844, "rsi": 84.7}
+{"time": "2026-06-08T08:24:05.689000+08:00", "symbol": "SNDKUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 545.7, "quality": 76.8, "change_pct": 1.22, "rsi": 58.25}
+{"time": "2026-06-08T08:24:29.748000+08:00", "symbol": "MUUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 569.7, "quality": 100.0, "change_pct": 2.464, "rsi": 59.02}
+{"time": "2026-06-08T08:25:54.764000+08:00", "symbol": "CRCLUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 654.8, "quality": 95.7, "change_pct": 1.844, "rsi": 84.7}
+{"time": "2026-06-08T08:26:17.926000+08:00", "symbol": "SNDKUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 677.9, "quality": 76.8, "change_pct": 1.22, "rsi": 58.25}
+{"time": "2026-06-08T08:26:41.933000+08:00", "symbol": "MUUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 701.9, "quality": 100.0, "change_pct": 2.464, "rsi": 59.02}
+{"time": "2026-06-08T08:28:06.961000+08:00", "symbol": "CRCLUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 787.0, "quality": 95.7, "change_pct": 1.844, "rsi": 84.7}
+{"time": "2026-06-08T08:28:30.305000+08:00", "symbol": "SNDKUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 810.3, "quality": 76.8, "change_pct": 1.22, "rsi": 58.25}
+{"time": "2026-06-08T08:28:54.337000+08:00", "symbol": "MUUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 834.3, "quality": 100.0, "change_pct": 2.464, "rsi": 59.02}
+{"time": "2026-06-08T10:15:41.625000+08:00", "symbol": "XRPUSDT", "status": "closed", "reason": "max_hold", "pnl_usd": -5.0666}
+{"time": "2026-06-08T10:16:04.794000+08:00", "symbol": "TONUSDT", "status": "closed", "reason": "max_hold", "pnl_usd": -5.3184}
+{"time": "2026-06-08T15:15:59.637000+08:00", "symbol": "VVVUSDT", "status": "sl_failed", "sl_price": 16.65587, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-08T15:15:59.741000+08:00", "symbol": "VVVUSDT", "status": "tp_failed", "tp_price": 18.458825, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-08T15:15:59.742000+08:00", "symbol": "VVVUSDT", "status": "protective_order_failed", "sl_ok": false, "tp_ok": false, "quantity": 52.13, "entry_price": 17.171}
+{"time": "2026-06-08T15:16:31.386000+08:00", "symbol": "VVVUSDT", "status": "protective_failed_closed", "exit_price": 17.1644135, "pnl_usd": -0.7014}
+{"time": "2026-06-08T15:17:48.253000+08:00", "symbol": "VVVUSDT", "status": "sl_failed", "sl_price": 16.76257, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-08T15:17:48.357000+08:00", "symbol": "VVVUSDT", "status": "tp_failed", "tp_price": 18.577075, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-08T15:17:48.358000+08:00", "symbol": "VVVUSDT", "status": "protective_order_failed", "sl_ok": false, "tp_ok": false, "quantity": 52.13, "entry_price": 17.281}
+{"time": "2026-06-08T15:18:01.292000+08:00", "symbol": "VVVUSDT", "status": "protective_failed_closed", "exit_price": 17.2603655, "pnl_usd": -1.436}
+{"time": "2026-06-08T15:19:18.313000+08:00", "symbol": "VVVUSDT", "status": "sl_failed", "sl_price": 16.681071, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-08T15:19:18.412000+08:00", "symbol": "VVVUSDT", "status": "tp_failed", "tp_price": 18.486754, "error": "{'error': 400, 'msg': '{\"code\":-4120,\"msg\":\"Order type not supported for this endpoint. Please use the Algo Order API endpoints instead.\"}'}"}
+{"time": "2026-06-08T15:19:18.413000+08:00", "symbol": "VVVUSDT", "status": "protective_order_failed", "sl_ok": false, "tp_ok": false, "quantity": 52.13, "entry_price": 17.19698005}
+{"time": "2026-06-08T15:19:30.886000+08:00", "symbol": "VVVUSDT", "status": "protective_failed_closed", "exit_price": 17.1644135, "pnl_usd": -2.0563}
+{"time": "2026-06-08T15:20:46.759000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 346.8, "quality": 91.0, "change_pct": 2.251, "rsi": 66.19}
+{"time": "2026-06-08T15:22:17.147000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 437.1, "quality": 91.0, "change_pct": 2.251, "rsi": 66.19}
+{"time": "2026-06-08T15:23:45.694000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 525.7, "quality": 91.0, "change_pct": 2.251, "rsi": 66.19}
+{"time": "2026-06-08T15:25:14.280000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 614.3, "quality": 91.0, "change_pct": 2.251, "rsi": 66.19}
+{"time": "2026-06-08T15:26:42.780000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 702.8, "quality": 91.0, "change_pct": 2.251, "rsi": 66.19}
+{"time": "2026-06-08T15:28:11.291000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 791.3, "quality": 91.0, "change_pct": 2.251, "rsi": 66.19}
+{"time": "2026-06-08T15:29:39.825000+08:00", "symbol": "VVVUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 879.8, "quality": 91.0, "change_pct": 2.251, "rsi": 66.19}
+{"time": "2026-06-08T19:15:44.135000+08:00", "symbol": "SNDKUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-1121,\"msg\":\"Invalid symbol.\"}'}"}
+{"time": "2026-06-08T19:17:00.148000+08:00", "symbol": "SNDKUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-1121,\"msg\":\"Invalid symbol.\"}'}"}
+{"time": "2026-06-08T19:18:16.132000+08:00", "symbol": "SNDKUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-1121,\"msg\":\"Invalid symbol.\"}'}"}
+{"time": "2026-06-08T19:19:32.076000+08:00", "symbol": "SNDKUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-1121,\"msg\":\"Invalid symbol.\"}'}"}
+{"time": "2026-06-08T19:20:47.354000+08:00", "symbol": "SNDKUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 347.4, "quality": 72.6, "change_pct": 1.264, "rsi": 79.31}
+{"time": "2026-06-08T19:22:06.136000+08:00", "symbol": "SNDKUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 426.1, "quality": 72.6, "change_pct": 1.264, "rsi": 79.31}
+{"time": "2026-06-08T19:23:37.772000+08:00", "symbol": "SNDKUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 517.8, "quality": 72.6, "change_pct": 1.264, "rsi": 79.31}
+{"time": "2026-06-08T19:25:05.801000+08:00", "symbol": "SNDKUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 605.8, "quality": 72.6, "change_pct": 1.264, "rsi": 79.31}
+{"time": "2026-06-08T19:26:33.717000+08:00", "symbol": "SNDKUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 693.7, "quality": 72.6, "change_pct": 1.264, "rsi": 79.31}
+{"time": "2026-06-08T19:28:01.773000+08:00", "symbol": "SNDKUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 781.8, "quality": 72.6, "change_pct": 1.264, "rsi": 79.31}
+{"time": "2026-06-08T19:29:29.908000+08:00", "symbol": "SNDKUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 869.9, "quality": 72.6, "change_pct": 1.264, "rsi": 79.31}
+{"time": "2026-06-08T21:15:06.672000+08:00", "symbol": "INTCUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-4411,\"msg\":\"Please sign TradFi-Perps agreement contract fapi.\"}'}"}
+{"time": "2026-06-08T21:16:22.733000+08:00", "symbol": "INTCUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-4411,\"msg\":\"Please sign TradFi-Perps agreement contract fapi.\"}'}"}
+{"time": "2026-06-08T21:17:39.097000+08:00", "symbol": "INTCUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-4411,\"msg\":\"Please sign TradFi-Perps agreement contract fapi.\"}'}"}
+{"time": "2026-06-08T21:18:55.111000+08:00", "symbol": "INTCUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-4411,\"msg\":\"Please sign TradFi-Perps agreement contract fapi.\"}'}"}
+{"time": "2026-06-08T21:20:10.690000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 310.7, "quality": 100.0, "change_pct": 8.574, "rsi": 96.27}
+{"time": "2026-06-08T21:21:29.426000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 389.4, "quality": 100.0, "change_pct": 8.574, "rsi": 96.27}
+{"time": "2026-06-08T21:23:00.970000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 481.0, "quality": 100.0, "change_pct": 8.574, "rsi": 96.27}
+{"time": "2026-06-08T21:24:29.107000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 569.1, "quality": 100.0, "change_pct": 8.574, "rsi": 96.27}
+{"time": "2026-06-08T21:25:57.027000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 657.0, "quality": 100.0, "change_pct": 8.574, "rsi": 96.27}
+{"time": "2026-06-08T21:27:25.105000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 745.1, "quality": 100.0, "change_pct": 8.574, "rsi": 96.27}
+{"time": "2026-06-08T21:28:53.019000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 833.0, "quality": 100.0, "change_pct": 8.574, "rsi": 96.27}
+{"time": "2026-06-08T22:15:48.443000+08:00", "symbol": "VVVUSDT", "status": "opened", "position": {"id": 13, "symbol": "VVVUSDT", "entry_time": "2026-06-08T22:15:48.443000+08:00", "entry_time_ms": 1780928148443, "signal_time_ms": 1780927200000, "entry_price": 18.072, "margin_usd": 300.4169, "notional_usd": 901.2506, "quantity": 49.87, "direction": "long", "stop_loss": 17.52984, "take_profit": 19.4274, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 76.4, "change_pct": 1.542, "rsi": 66.82, "binance_order_id": 174946492, "sl_order_id": "software_sl", "tp_order_id": "software_tp"}}
+{"time": "2026-06-08T22:16:13.032000+08:00", "symbol": "INTCUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-4411,\"msg\":\"Please sign TradFi-Perps agreement contract fapi.\"}'}"}
+{"time": "2026-06-08T22:17:41.747000+08:00", "symbol": "INTCUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-4411,\"msg\":\"Please sign TradFi-Perps agreement contract fapi.\"}'}"}
+{"time": "2026-06-08T22:19:10.375000+08:00", "symbol": "INTCUSDT", "status": "open_failed", "error": "{'error': 400, 'msg': '{\"code\":-4411,\"msg\":\"Please sign TradFi-Perps agreement contract fapi.\"}'}"}
+{"time": "2026-06-08T22:20:38.308000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 338.3, "quality": 70.4, "change_pct": 1.468, "rsi": 70.06}
+{"time": "2026-06-08T22:22:06.294000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 426.3, "quality": 70.4, "change_pct": 1.468, "rsi": 70.06}
+{"time": "2026-06-08T22:23:34.256000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 514.3, "quality": 70.4, "change_pct": 1.468, "rsi": 70.06}
+{"time": "2026-06-08T22:25:02.372000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 602.4, "quality": 70.4, "change_pct": 1.468, "rsi": 70.06}
+{"time": "2026-06-08T22:26:30.363000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 690.4, "quality": 70.4, "change_pct": 1.468, "rsi": 70.06}
+{"time": "2026-06-08T22:27:58.170000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 778.2, "quality": 70.4, "change_pct": 1.468, "rsi": 70.06}
+{"time": "2026-06-08T22:29:26.272000+08:00", "symbol": "INTCUSDT", "status": "rejected", "reason": "entry_window_missed", "lag_sec": 866.3, "quality": 70.4, "change_pct": 1.468, "rsi": 70.06}
+{"time": "2026-06-08T23:15:27.455000+08:00", "symbol": "TONUSDT", "status": "opened", "position": {"id": 14, "symbol": "TONUSDT", "entry_time": "2026-06-08T23:15:27.455000+08:00", "entry_time_ms": 1780931727455, "signal_time_ms": 1780930800000, "entry_price": 1.7679, "margin_usd": 300.1305, "notional_usd": 900.3915, "quantity": 509.3, "direction": "long", "stop_loss": 1.714863, "take_profit": 1.9004925, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 100.0, "change_pct": 2.482, "rsi": 58.65, "binance_order_id": 188756379, "sl_order_id": "software_sl", "tp_order_id": "software_tp"}}
+{"time": "2026-06-08T23:15:40.172000+08:00", "symbol": "ADAUSDT", "status": "opened", "position": {"id": 15, "symbol": "ADAUSDT", "entry_time": "2026-06-08T23:15:40.172000+08:00", "entry_time_ms": 1780931740172, "signal_time_ms": 1780930800000, "entry_price": 0.171, "margin_usd": 300.162, "notional_usd": 900.486, "quantity": 5266.0, "direction": "long", "stop_loss": 0.16587, "take_profit": 0.18383, "sl_pct": 0.03, "tp_pct": 0.075, "quality": 89.6, "change_pct": 1.726, "rsi": 65.29, "binance_order_id": 692181044, "sl_order_id": "software_sl", "tp_order_id": "software_tp"}}
+{"time": "2026-06-09T00:32:51.526000+08:00", "symbol": "VVVUSDT", "status": "closed", "reason": "stop_loss", "pnl_usd": -26.9299}
+{"time": "2026-06-09T03:16:24.438000+08:00", "symbol": "TONUSDT", "status": "closed", "reason": "max_hold", "pnl_usd": 3.0584}
+{"time": "2026-06-09T03:16:35.440000+08:00", "symbol": "ADAUSDT", "status": "closed", "reason": "max_hold", "pnl_usd": 0.2422}
+{"time": "2026-06-09T15:51:11.944000+08:00", "symbol": "POWERUSDT", "status": "orphan_position", "positionAmt": 2016.0, "direction": "long", "entry_price": 0.09115, "notional": 183.41753472}
+{"time": "2026-06-09T15:51:37.547000+08:00", "symbol": "POWERUSDT", "status": "orphan_closed", "exit_price": 0.09092, "quantity": 2016.0}
+{"time": "2026-06-09T16:01:39.377000+08:00", "symbol": "SIRENUSDT", "status": "orphan_position", "positionAmt": 55.0, "direction": "long", "entry_price": 1.23327, "notional": 67.9466238}
+{"time": "2026-06-09T16:02:06.499000+08:00", "symbol": "SIRENUSDT", "status": "orphan_closed", "exit_price": 1.2338, "quantity": 55.0}
+{"time": "2026-06-28T15:43:48.854000+08:00", "symbol": "FILUSDT", "status": "orphan_position", "positionAmt": -21.6, "direction": "short", "entry_price": 0.725, "notional": 15.82032103}
+{"time": "2026-06-28T15:44:24.726000+08:00", "symbol": "FILUSDT", "status": "orphan_closed", "exit_price": 0.733, "quantity": 21.6}
+{"time": "2026-06-28T15:44:37.496000+08:00", "symbol": "UNIUSDT", "status": "orphan_position", "positionAmt": -8.0, "direction": "short", "entry_price": 2.972, "notional": 23.21666288}
+{"time": "2026-06-28T15:44:51.629000+08:00", "symbol": "UNIUSDT", "status": "orphan_closed", "exit_price": 2.903, "quantity": 8.0}
+{"time": "2026-06-28T15:45:16.276000+08:00", "symbol": "XLMUSDT", "status": "orphan_position", "positionAmt": -99.0, "direction": "short", "entry_price": 0.17563, "notional": 17.00220555}
+{"time": "2026-06-28T15:45:40.384000+08:00", "symbol": "XLMUSDT", "status": "orphan_closed", "exit_price": 0.17171, "quantity": 99.0}
+{"time": "2026-06-28T17:00:39.256000+08:00", "symbol": "BEATUSDT", "status": "orphan_position", "positionAmt": 321.0, "direction": "long", "entry_price": 2.80458, "notional": 897.45283041}
+{"time": "2026-06-28T17:01:02.560000+08:00", "symbol": "BEATUSDT", "status": "orphan_closed", "exit_price": 2.78938, "quantity": 321.0}
+{"time": "2026-06-28T17:32:09.130000+08:00", "symbol": "LABUSDT", "status": "orphan_position", "positionAmt": 51.0, "direction": "long", "entry_price": 17.641448490196076, "notional": 899.691}
+{"time": "2026-06-28T17:32:32.438000+08:00", "symbol": "LABUSDT", "status": "orphan_closed", "exit_price": 17.641, "quantity": 51.0}
+{"time": "2026-06-28T18:04:44.372000+08:00", "symbol": "WLDUSDT", "status": "orphan_position", "positionAmt": -1987.0, "direction": "short", "entry_price": 0.45201821841972817, "notional": 898.07567616}
+{"time": "2026-06-28T18:05:07.677000+08:00", "symbol": "WLDUSDT", "status": "orphan_closed", "exit_price": 0.4533, "quantity": 1987.0}
+{"time": "2026-06-28T20:00:41.408000+08:00", "symbol": "SUSDT", "status": "orphan_position", "positionAmt": 34642.0, "direction": "long", "entry_price": 0.026099999999999998, "notional": 897.42422014}
+{"time": "2026-06-28T20:01:04.713000+08:00", "symbol": "SUSDT", "status": "orphan_closed", "exit_price": 0.0258, "quantity": 34642.0}
+{"time": "2026-06-28T21:14:59.818000+08:00", "symbol": "RAVEUSDT", "status": "orphan_position", "positionAmt": 2950.0, "direction": "long", "entry_price": 0.30551, "notional": 899.925702}
+{"time": "2026-06-28T21:15:23.257000+08:00", "symbol": "RAVEUSDT", "status": "orphan_closed", "exit_price": 0.3048, "quantity": 2950.0}
+{"time": "2026-06-28T22:21:38.697000+08:00", "symbol": "JTOUSDT", "status": "orphan_position", "positionAmt": 1050.0, "direction": "long", "entry_price": 0.8573999999999999, "notional": 899.549574}
+{"time": "2026-06-28T22:22:02.169000+08:00", "symbol": "JTOUSDT", "status": "orphan_closed", "exit_price": 0.8557, "quantity": 1050.0}
+{"time": "2026-06-29T00:46:17.752000+08:00", "symbol": "ENAUSDT", "status": "orphan_position", "positionAmt": -11883.0, "direction": "short", "entry_price": 0.0756, "notional": 899.5431}
+{"time": "2026-06-29T00:46:41.120000+08:00", "symbol": "ENAUSDT", "status": "orphan_closed", "exit_price": 0.0757951, "quantity": 11883.0}
+{"time": "2026-06-29T03:47:02.099000+08:00", "symbol": "ZECUSDT", "status": "orphan_position", "positionAmt": -2.38, "direction": "short", "entry_price": 377.90000000000003, "notional": 899.77311144}
+{"time": "2026-06-29T03:47:25.342000+08:00", "symbol": "ZECUSDT", "status": "orphan_closed", "exit_price": 378.052, "quantity": 2.38}
+{"time": "2026-06-29T05:33:05.444000+08:00", "symbol": "POWRUSDT", "status": "orphan_position", "positionAmt": 17411.0, "direction": "long", "entry_price": 0.051699999999999996, "notional": 898.4076}
+{"time": "2026-06-29T05:33:28.733000+08:00", "symbol": "POWRUSDT", "status": "orphan_closed", "exit_price": 0.0515, "quantity": 17411.0}
+{"time": "2026-06-29T08:49:13.110000+08:00", "status": "position_sync_error", "error": "{'error': 418, 'msg': '{\"code\":-1003,\"msg\":\"Way too many requests; IP(52.46.54.195) banned until 1782694379992. Please use the websocket for live updates to avoid bans.\"}'}"}
+{"time": "2026-06-29T08:50:18.867000+08:00", "status": "position_sync_error", "error": "{'error': 418, 'msg': '{\"code\":-1003,\"msg\":\"Way too many requests; IP(52.46.54.195) banned until 1782694379992. Please use the websocket for live updates to avoid bans.\"}'}"}
+{"time": "2026-06-29T08:52:30.375000+08:00", "status": "position_sync_error", "error": "{'error': 418, 'msg': '{\"code\":-1003,\"msg\":\"Way too many requests; IP(52.46.54.195) banned until 1782694379992. Please use the websocket for live updates to avoid bans.\"}'}"}
