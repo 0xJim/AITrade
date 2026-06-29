@@ -296,16 +296,42 @@ def daily_entry_count(st: dict, symbol: str) -> int:
 
 # ── 通知 ──────────────────────────────────────────────────────────
 
+def _reason_cn(reason: str) -> str:
+    """平仓原因英文转中文"""
+    mapping = {
+        "stop_loss": "触发止损",
+        "take_profit": "触发止盈",
+        "max_hold": "超时平仓(到达最大持仓时间)",
+        "force_max_hold": "强制超时平仓",
+        "emergency_close_pending": "应急平仓(前次失败重试)",
+        "orphan_position": "孤儿仓位清理",
+        "protective_order_failed": "保护单失败应急平仓",
+    }
+    return mapping.get(reason, reason)
+
+
+def _current_balance() -> float:
+    """从state文件读取当前余额"""
+    try:
+        with open(STATE_FILE) as f:
+            st = json.load(f)
+        return float(st.get("balance", INITIAL_BALANCE))
+    except Exception:
+        return INITIAL_BALANCE
+
+
 def notify_open(pos: dict, signal: dict) -> None:
     """发送开仓通知"""
+    bal = _current_balance()
+    pct_of_bal = pos['margin_usd'] / bal * 100 if bal > 0 else 0
     msg = f"""🟢 S24 开仓
 币种: {pos['symbol']}
 方向: 做多
 入场价: {pos['entry_price']}
-保证金: {pos['margin_usd']:.2f}U ({pos['margin_usd']/pos['notional_usd']*100:.0f}% × {LEVERAGE}x)
-名义值: {pos['notional_usd']:.2f}U
-止损: {pos['stop_loss']} ({pos['sl_pct']*100:.1f}%)
-止盈: {pos['take_profit']} ({pos['tp_pct']*100:.1f}%)
+保证金: {pos['margin_usd']:.2f}U (占余额{pct_of_bal:.1f}%)
+名义值: {pos['notional_usd']:.2f}U ({LEVERAGE}x杠杆)
+止损: {pos['stop_loss']} (下跌{pos['sl_pct']*100:.1f}%)
+止盈: {pos['take_profit']} (上涨{pos['tp_pct']*100:.1f}%)
 质量分: {pos['quality']}
 涨幅: {pos.get('change_pct', 'N/A')}%
 RSI: {pos.get('rsi', 'N/A')}
@@ -317,11 +343,15 @@ def notify_close(pos: dict, exit_price: float, reason: str, pnl: float, balance:
     """发送平仓通知"""
     emoji = "✅" if pnl > 0 else "❌"
     hold_h = (now_ms() - pos.get("entry_time_ms", now_ms())) / MS_1H
+    reason_cn = _reason_cn(reason)
+    entry_px = float(pos.get("entry_price", 0) or 0)
+    price_change = (exit_price - entry_px) / entry_px * 100 if entry_px > 0 else 0
     msg = f"""{emoji} S24 平仓
 币种: {pos['symbol']}
 入场: {pos['entry_price']}
 平仓: {exit_price:.8f}
-原因: {reason}
+价格变动: {price_change:+.2f}%
+原因: {reason_cn}
 PnL: {pnl:+.2f}U
 持仓时长: {hold_h:.1f}h
 质量分: {pos['quality']}
