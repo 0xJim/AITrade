@@ -10,6 +10,9 @@ WorkingDirectory=/home/ubuntu/AITrade/strategies/S24-ignition/testnet
 ExecStart=/home/ubuntu/.hermes/hermes-agent/venv/bin/python3 -u s24_trader.py --loop --interval 60 --max-entry-lag-sec 300 --use-pool-state
 Restart=always
 RestartSec=10
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=15
 StandardOutput=append:/home/ubuntu/AITrade/strategies/S24-ignition/logs/s24_testnet.log
 StandardError=append:/home/ubuntu/AITrade/strategies/S24-ignition/logs/s24_testnet.log
 

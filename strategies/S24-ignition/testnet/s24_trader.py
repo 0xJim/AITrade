@@ -817,10 +817,34 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def _acquire_lock(timeout: float = 0.1) -> bool:
+    """文件锁，防止多进程同时运行重复下单"""
+    import fcntl
+    lock_path = DATA_DIR / "s24.lock"
+    global _lock_fd
+    _lock_fd = open(lock_path, "w")
+    try:
+        fcntl.flock(_lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _lock_fd.write(str(os.getpid()))
+        _lock_fd.flush()
+        return True
+    except (IOError, OSError):
+        _lock_fd.close()
+        return False
+
+
+_lock_fd = None
+
+
 def main() -> int:
     args = parse_args()
     if not args.once and not args.loop:
         args.once = True
+
+    if not _acquire_lock():
+        print(f"[{datetime.now().isoformat()}] 另一个s24_trader实例正在运行，退出")
+        return 0
+
     while True:
         try:
             run_once(args)
